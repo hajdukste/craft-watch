@@ -31,7 +31,8 @@ jobs:
           lookup-only: true
 
       - name: Say which state this run uses
-        run: echo "Saved state: ${{ steps.state.outputs.cache-matched-key || 'none, first full fetch (20 min limit)' }}"
+        run: |
+          echo "Saved state: ${{ steps.state.outputs.cache-matched-key || 'none, first full fetch (20 min limit)' }}"
 
   collect:
     needs: plan
