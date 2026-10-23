@@ -1,9 +1,9 @@
 name: Update data
 
 on:
-  # Hourly while the repo is private (Actions minutes). Switch to '*/15 * * * *' when the repo goes public.
+  # Every 15 minutes (public repo: standard runners are free).
   schedule:
-    - cron: '0 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
