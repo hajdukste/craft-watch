@@ -19,8 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      cold: ${{ steps.state.outputs.cache-hit != 'true' }}
+      cold: ${{ steps.state.outputs.cache-matched-key == '' }}
     steps:
+      # cache-matched-key also matches the prefix; cache-hit would be false on every run (the key is unique per run).
       - id: state
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -28,6 +29,9 @@ jobs:
           key: state-v3-${{ github.run_id }}
           restore-keys: state-v3-
           lookup-only: true
+
+      - name: Say which state this run uses
+        run: echo "Saved state: ${{ steps.state.outputs.cache-matched-key || 'none, first full fetch (20 min limit)' }}"
 
   collect:
     needs: plan
