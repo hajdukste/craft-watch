@@ -1,0 +1,398 @@
+:root {
+  --bg: #05060A;
+  --panel: #0C0E16;
+  --line: rgba(255, 255, 255, 0.1);
+  --text: #E8ECF2;
+  --soft: #C9D1DC;
+  --muted: #9AA4B2;
+  --accent: #A78BFA;
+  --ok: #22C55E;
+  --bad: #EF4444;
+  --warn: #FACC15;
+  --closed: #94A3B8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+body {
+  min-width: 320px;
+}
+
+/* The hero is the mockup at 1920x1080, scaled to the window width. */
+.hero {
+  width: 100%;
+  max-width: 1920px;
+  margin: 0 auto;
+  background: var(--bg);
+}
+
+.hero svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.all,
+.top,
+.bar {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.all {
+  padding-bottom: 24px;
+}
+
+h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.burst {
+  margin: 6px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  color: var(--warn);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+a {
+  color: var(--accent);
+}
+
+h1,
+h2 {
+  margin: 0;
+}
+
+h2 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.note {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 16px 0 8px;
+}
+
+.back {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.brand {
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.brand span,
+.crumb {
+  color: var(--accent);
+}
+
+.crumb {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.status.warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs a {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--soft);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tabs a[aria-current="page"] {
+  border-color: var(--tab);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.app-head {
+  padding: 16px 0 4px;
+}
+
+.app-name {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.banner {
+  margin: 8px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  color: var(--warn);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--soft);
+}
+
+.filters fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.filters legend {
+  padding: 0 4px;
+  color: var(--muted);
+}
+
+select,
+input[type="date"] {
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+.counters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  padding: 14px 0;
+}
+
+.counter {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.counter strong {
+  display: block;
+  font: 800 26px 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.counter span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+section {
+  padding: 14px 0;
+}
+
+#speed,
+#lanes {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+#lanes {
+  min-width: 720px;
+}
+
+.scrub-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.asof {
+  margin: 0;
+  font: 700 18px 'JetBrains Mono', ui-monospace, monospace;
+}
+
+button {
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--soft);
+  font: 600 14px Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin-top: 8px;
+  accent-color: var(--accent);
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.list li {
+  color: var(--soft);
+}
+
+.techies {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.techies dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
+.techies dt {
+  color: var(--muted);
+}
+
+.techies dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font: 600 13px 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--soft);
+}
+
+.bar {
+  padding-top: 16px;
+  padding-bottom: 24px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 860px) {
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .app-name {
+    font-size: 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.toolbar {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+}
+
+.toolbar button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid #3A4252;
+  border-radius: 10px;
+  background: #141821;
+  color: var(--soft);
+  font: 700 14px Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.toolbar button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: rgba(167, 139, 250, 0.2);
+  color: var(--text);
+}

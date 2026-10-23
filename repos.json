@@ -1,0 +1,106 @@
+{
+  "_note": "Verified in phase 1 against the storytold org (public, not archived). Latest release tags checked 23 Oct 2026. Colours for the first 6 apps come from SPEC §2; the others are picks to keep them distinct on #05060A. AniCraft has no published release yet (show 'none found').",
+  "org": {
+    "login": "storytold",
+    "name": "ArtCraft",
+    "site": "https://getartcraft.com"
+  },
+  "apps": [
+    {
+      "name": "ArtCraft",
+      "repo": "storytold/artcraft",
+      "colour": "#E879F9",
+      "download": "https://github.com/storytold/artcraft/releases"
+    },
+    {
+      "name": "PhotoCraft",
+      "repo": "storytold/photocraft",
+      "colour": "#60A5FA",
+      "download": "https://github.com/storytold/photocraft/releases"
+    },
+    {
+      "name": "FilmCraft",
+      "repo": "storytold/filmcraft",
+      "colour": "#FB923C",
+      "download": "https://github.com/storytold/filmcraft/releases"
+    },
+    {
+      "name": "PdfCraft",
+      "repo": "storytold/pdfcraft",
+      "colour": "#A78BFA",
+      "download": "https://github.com/storytold/pdfcraft/releases"
+    },
+    {
+      "name": "EffectCraft",
+      "repo": "storytold/effectcraft",
+      "colour": "#F472B6",
+      "download": "https://github.com/storytold/effectcraft/releases"
+    },
+    {
+      "name": "FigCraft",
+      "repo": "storytold/figcraft",
+      "colour": "#2DD4BF",
+      "download": "https://github.com/storytold/figcraft/releases"
+    },
+    {
+      "name": "LightCraft",
+      "repo": "storytold/lightcraft",
+      "colour": "#FCD34D",
+      "download": "https://github.com/storytold/lightcraft/releases"
+    },
+    {
+      "name": "VectorCraft",
+      "repo": "storytold/vectorcraft",
+      "colour": "#818CF8",
+      "download": "https://github.com/storytold/vectorcraft/releases"
+    },
+    {
+      "name": "DesignCraft",
+      "repo": "storytold/designcraft",
+      "colour": "#A3E635",
+      "download": "https://github.com/storytold/designcraft/releases"
+    },
+    {
+      "name": "WordCraft",
+      "repo": "storytold/wordcraft",
+      "colour": "#7DD3FC",
+      "download": "https://github.com/storytold/wordcraft/releases"
+    },
+    {
+      "name": "GridCraft",
+      "repo": "storytold/gridcraft",
+      "colour": "#86EFAC",
+      "download": "https://github.com/storytold/gridcraft/releases"
+    },
+    {
+      "name": "DeckCraft",
+      "repo": "storytold/deckcraft",
+      "colour": "#FDA4AF",
+      "download": "https://github.com/storytold/deckcraft/releases"
+    },
+    {
+      "name": "CadCraft",
+      "repo": "storytold/cadcraft",
+      "colour": "#38BDF8",
+      "download": "https://github.com/storytold/cadcraft/releases"
+    },
+    {
+      "name": "SoundCraft",
+      "repo": "storytold/soundcraft",
+      "colour": "#C084FC",
+      "download": "https://github.com/storytold/soundcraft/releases"
+    },
+    {
+      "name": "AniCraft",
+      "repo": "storytold/AniCraft",
+      "colour": "#F59E0B",
+      "download": "https://github.com/storytold/AniCraft/releases"
+    },
+    {
+      "name": "CraftLauncher",
+      "repo": "storytold/craft-launcher",
+      "colour": "#CBD5E1",
+      "download": "https://github.com/storytold/craft-launcher/releases"
+    }
+  ]
+}

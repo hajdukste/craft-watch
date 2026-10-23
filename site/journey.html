@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Craft Watch · Journey</title>
+  <meta name="description" content="How one change travels from suggestion to release, for each ArtCraft app. Public GitHub data. Signals, not a guarantee.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="journey.css">
+</head>
+<body>
+  <div class="toolbar" role="group" aria-label="View">
+    <button type="button" id="plain-toggle" aria-pressed="true">Plain words: on</button>
+    <button type="button" id="xray-toggle" aria-pressed="false">Open X-RAY</button>
+  </div>
+  <section class="hero" aria-label="The journey of one featured change">
+    <svg id="hero" viewBox="0 0 1920 1080" role="img" aria-label="Six steps from suggestion to install for the featured change of the selected app"></svg>
+  </section>
+
+  <header class="top">
+    <a class="back" href="index.html">← Space view</a>
+    <a class="back" id="app-page-link" href="app.html">App page →</a>
+    <p class="brand">CRAFT<span> WATCH</span> <span class="crumb">· Journey</span></p>
+    <p id="status" class="status">Loading data…</p>
+  </header>
+
+  <p id="banner" class="banner" hidden></p>
+
+  <section class="all" id="all" aria-labelledby="all-title">
+    <h2 id="all-title">All changes</h2>
+    <p class="note">Every change in the chosen range. Click a row to move the journey and the X-RAY above to that change.</p>
+    <p id="burst-all" class="burst" hidden></p>
+
+    <div class="filters" aria-label="Filters">
+      <label>Date
+        <select id="range">
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="day">A specific day</option>
+          <option value="custom">Custom range</option>
+        </select>
+      </label>
+      <label id="day-wrap" hidden>Day <input type="date" id="day"></label>
+      <label id="from-wrap" hidden>From <input type="date" id="from"></label>
+      <label id="to-wrap" hidden>To <input type="date" id="to"></label>
+      <fieldset>
+        <legend>Status</legend>
+        <label><input type="checkbox" name="status" value="arrived" checked> arrived</label>
+        <label><input type="checkbox" name="status" value="merged" checked> merged</label>
+        <label><input type="checkbox" name="status" value="failed" checked> failed checks</label>
+        <label><input type="checkbox" name="status" value="closed" checked> closed without merging</label>
+        <label><input type="checkbox" name="status" value="released" checked> released</label>
+      </fieldset>
+      <fieldset>
+        <legend>Who</legend>
+        <label><input type="checkbox" name="who" value="human" checked> human</label>
+        <label><input type="checkbox" name="who" value="bot" checked> bot</label>
+        <label><input type="checkbox" name="who" value="unknown" checked> not recorded</label>
+      </fieldset>
+    </div>
+
+    <p id="counters-note" class="note"></p>
+    <section class="counters" id="counters" aria-label="Counters"></section>
+
+    <section class="speed">
+      <h3>Merged per day</h3>
+      <svg id="speed" viewBox="0 0 1200 110" role="img" aria-label="Bar chart of merged pull requests per day in the chosen range"></svg>
+    </section>
+
+    <section class="scrub">
+      <div class="scrub-head">
+        <p id="asof" class="asof"></p>
+        <button type="button" id="now">Now</button>
+      </div>
+      <input type="range" id="scrub" min="0" max="1000" value="1000" aria-label="Replay time">
+    </section>
+
+    <section class="rows">
+      <h3>The journey of each change</h3>
+      <p class="note">Each row is one pull request on a timeline. A white dot is when it was suggested, a green dot is merged,
+        a grey dot is closed without merging, an amber ring is still open. The square at the end is the latest checks result.
+        Stars are releases. A change counts as shipped only when a release was published after its merge.</p>
+      <div class="scroll"><svg id="lanes" role="img" aria-label="One row per pull request over the chosen time range"></svg></div>
+      <p id="shown" class="note"></p>
+    </section>
+
+    <div class="two-col">
+      <section class="daylist">
+        <h3 id="daylist-title">Day view</h3>
+        <ol id="daylist" class="list"></ol>
+      </section>
+      <section class="versions">
+        <h3>Versions in range</h3>
+        <div id="versions" class="chips"></div>
+      </section>
+    </div>
+  </section>
+
+  <footer class="bar">
+    <p class="note">Beta · unofficial · not affiliated with ArtCraft/storytold · signals, not a guarantee</p>
+  </footer>
+
+  <script src="journey.js" type="module"></script>
+</body>
+</html>

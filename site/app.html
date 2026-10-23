@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Craft Watch · App</title>
+  <meta name="description" content="Should I update today, what do we see for my version, what changed, where to get the real app, and how to use it well. Based on public GitHub records only. Signals, not a guarantee.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="page">
+    <header class="head">
+      <div class="brandrow">
+        <span class="brand">CRAFT<span> WATCH</span></span>
+        <span class="badge">by Overprivileged</span>
+      </div>
+      <span class="sub">Every public change to the ArtCraft apps, drawn live from GitHub.</span>
+      <div class="navrow">
+        <a href="index.html">← Space view</a>
+        <a id="journey-link" href="journey.html">Journey of one change →</a>
+        <span id="status" class="status">Loading data…</span>
+      </div>
+    </header>
+
+    <p id="banner" class="banner" hidden></p>
+
+    <section class="panel news" aria-labelledby="h-news">
+      <div class="news-head">
+        <h2 id="h-news">What’s new this week</h2>
+        <a id="see-all" href="#">See all changes →</a>
+      </div>
+      <p class="note">Plain sentences from the public titles of merged changes. Up to 8, grouped.</p>
+      <div id="news-groups" class="groups"></div>
+    </section>
+
+    <div class="top">
+      <div class="left">
+      <section class="panel map-panel" aria-labelledby="map-title">
+        <div class="map-head">
+          <h1 id="map-title" class="app-title">Version map</h1>
+          <span id="app-meta" class="note"></span>
+        </div>
+        <svg id="map" viewBox="0 0 1200 300" role="img" aria-label="Version map of the app over the last 30 days: releases, commits, changes that name advisories, open reports"></svg>
+        <div class="legend">
+          <span><i class="dot white"></i>commit</span>
+          <span><i class="dot ring"></i>release</span>
+          <span><i class="band"></i>change naming an advisory, shipped</span>
+          <span><i class="dot green-ring"></i>fixed here</span>
+          <span><i class="dot amber"></i>advisories with no fixed release</span>
+        </div>
+      </section>
+      <section class="panel better" aria-labelledby="h-better">
+        <h2 id="h-better">Is it getting better?</h2>
+        <p id="better-line" class="big-line"></p>
+        <div class="bar-track" role="img" aria-label="Share of this week's reports that were fixed"><div id="better-bar" class="bar-fill"></div></div>
+        <p id="better-meaning" class="note"></p>
+      </section>
+      <div class="cards-two">
+      <section class="panel" aria-labelledby="h-real">
+        <h2 id="h-real">Get the real one</h2>
+        <p>Official source: <a id="official" href="#">the releases page on GitHub</a>. Download only from there.</p>
+        <p id="latest-line" class="note"></p>
+        <p class="note">Check the file against the published checksum (only when checksums are listed for the release):</p>
+        <pre class="code">macOS:   shasum -a 256 path/to/file
+Linux:   sha256sum path/to/file
+Windows: certutil -hashfile path\to\file SHA256</pre>
+        <p class="note">Lookalike repositories: not checked yet. Our data does not list them, so search results may still show fakes.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="h-use">
+        <h2 id="h-use">How to use it well</h2>
+        <ol class="list">
+          <li>Take it from the official source only (above), then verify the checksum.</li>
+          <li>Update when the maintainers publish an advisory for your version, not on every release.</li>
+          <li>If you use AI tools or MCP servers with it, point them at one folder only.</li>
+          <li>Check what the app can access on your computer before you give it more.</li>
+          <li>To remove it cleanly, uninstall with the app's own uninstaller and delete its folder.</li>
+        </ol>
+        <p class="note">A guide with videos is planned. No link is listed yet.</p>
+      </section>
+
+      </div>
+      <section class="panel" aria-labelledby="h-alerts">
+        <h2 id="h-alerts">Get alerts</h2>
+        <ol class="list">
+          <li>On the repository page, choose Watch, then Custom, and tick Releases and Security alerts.</li>
+          <li>Or subscribe to the releases feed in any feed reader: <a id="feed" href="#">releases feed</a>.</li>
+        </ol>
+        <p class="note">A Craft Watch feed of advisories and releases is not built yet.</p>
+      </section>
+      </div>
+
+      <aside class="side">
+        <section class="panel verdict" aria-labelledby="h-update">
+          <h2 id="h-update">Should I update today?</h2>
+          <div id="update-box" class="result"></div>
+          <ul id="update-evidence" class="list"></ul>
+        </section>
+
+        <section class="panel verdict" aria-labelledby="h-version">
+          <h2 id="h-version">What do we see for my version?</h2>
+          <div class="pickers">
+            <label>App
+              <select id="app-pick"></select>
+            </label>
+            <label>Your version
+              <select id="version"></select>
+            </label>
+          </div>
+          <div id="version-box" class="result"></div>
+          <p class="note">Based on public advisories and issues only. Signals, not a guarantee.</p>
+        </section>
+      </aside>
+    </div>
+
+    <section id="stats" class="stats" aria-label="Measured numbers" hidden></section>
+
+    <section class="cards" aria-label="More">
+      <section class="panel wide" aria-labelledby="h-changed">
+        <h2 id="h-changed">What changed this week</h2>
+        <p class="note">Built from titles and release tags only. No AI summary is written here.</p>
+        <div class="two">
+          <div>
+            <h3>Releases (last 30 days)</h3>
+            <ol id="releases" class="list"></ol>
+          </div>
+          <div>
+            <h3>Merged in the last 7 days</h3>
+            <p id="merged-count" class="note"></p>
+            <ol id="merged" class="list"></ol>
+          </div>
+        </div>
+      </section>
+
+
+    </section>
+
+    <footer class="foot">
+      <span>Only public GitHub data · no logins, no cookies, no tracking · signals, not a guarantee.</span>
+      <span>Made by <a href="https://github.com/overprivileged">Overprivileged</a></span>
+    </footer>
+  </div>
+
+  <script src="app-page.js" type="module"></script>
+</body>
+</html>

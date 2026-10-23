@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Craft Watch</title>
+  <meta name="description" content="How fast the ArtCraft apps change, drawn live from public GitHub records. Signals, not a guarantee.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <section class="hero" id="hero">
+    <div class="viewport">
+      <main class="stage">
+        <div class="nebula nebula-purple" aria-hidden="true"></div>
+        <div class="nebula nebula-teal" aria-hidden="true"></div>
+        <div class="stars" aria-hidden="true"></div>
+        <div class="stars2" aria-hidden="true"></div>
+
+        <div class="brand">CRAFT<span> WATCH</span><span class="live"><span class="live-dot" aria-hidden="true"></span>LIVE</span></div>
+        <div class="controls" role="group" aria-label="Time and apps">
+          <button type="button" data-mode="live" aria-pressed="true">Live</button>
+          <button type="button" data-mode="hour" aria-pressed="false">1 h in 10 s</button>
+          <button type="button" data-mode="day" aria-pressed="false">1 day in 30 s</button>
+          <button type="button" data-mode="month" aria-pressed="false">30 days in 30 s</button>
+          <button type="button" id="more" aria-expanded="false" hidden></button>
+        </div>
+        <p id="clock" class="clock"></p>
+        <p id="bigclock" class="bigclock" hidden></p>
+
+        <svg id="space" viewBox="0 0 1920 1080" role="img" aria-label="One ArtCraft core with a lane for each app over the last 30 days. Dotted arcs are pull requests, white dots are merges, stars and dots on the lanes are releases, faint pulses are commits, red rings mark changes that name an advisory."></svg>
+
+        <footer class="bar">
+          <p id="totals" class="totals"></p>
+          <p id="status" class="status">Loading data…</p>
+          <p class="beta">Beta · unofficial · not affiliated with ArtCraft/storytold · signals, not a guarantee</p>
+        </footer>
+      </main>
+    </div>
+
+    <div class="overlay">
+      <p class="head-1">The reviews were written on day 1.</p>
+      <p class="head-2">ArtCraft apps have changed <span id="total-changes" class="num">…</span> times since.</p>
+      <p class="head-3"><span id="since-date">…</span> · one change every <span id="per-second">…</span> seconds · live from public GitHub</p>
+
+      <div class="fact" aria-live="polite">
+        <p id="fact-label" class="fact-label"></p>
+        <p id="fact-text" class="fact-text"></p>
+      </div>
+
+      <div class="cta-row">
+        <button type="button" id="watch" class="cta">Watch it live</button>
+        <button type="button" id="month" class="cta">30 days in 30 s</button>
+      </div>
+      <p class="since">Since you opened this page: <strong id="since-count">0</strong> new changes</p>
+    </div>
+    <button type="button" id="unwatch" class="unwatch">Back to the calm view</button>
+  </section>
+
+  <section class="section" aria-labelledby="news-title">
+    <h2 id="news-title">What’s new this week</h2>
+    <p class="note">Plain sentences from the public titles of merged changes, all apps, newest first. Up to 10.</p>
+    <ul id="weekly-news" class="list"></ul>
+  </section>
+
+  <section class="section" aria-labelledby="download-title">
+    <h2 id="download-title">Get the real download</h2>
+    <p class="note">Official GitHub release pages only. Check the file against the published checksum when one is listed.</p>
+    <ul id="downloads" class="downloads"></ul>
+  </section>
+
+  <section class="section" id="decide-title" aria-labelledby="decide-heading">
+    <h2 id="decide-heading">How we decide</h2>
+    <ul class="levels">
+      <li><strong>🟢 Looks calm.</strong> No crash-like reports spiked after the newest release, and we found no published security advisories for it.</li>
+      <li><strong>🟡 Wait a day.</strong> Reports that name the newest release, in its first 48 hours, are well above the usual for the app.</li>
+      <li><strong>🔴 Update now.</strong> A change that names an advisory shipped in a release. We point to that release.</li>
+    </ul>
+    <p class="note">Based on public GitHub records only. Signals, not a guarantee.</p>
+  </section>
+
+  <section class="section pick" aria-labelledby="pick-title">
+    <h2 id="pick-title" class="pick-title">Pick your app:</h2>
+    <div id="pick-row" class="pick-row"></div>
+  </section>
+
+  <footer class="section foot">
+    <p>No login, no cookies, no tracking · open source</p>
+    <p class="beta">Beta · unofficial · not affiliated with ArtCraft/storytold · signals, not a guarantee</p>
+  </footer>
+
+  <script src="app.js" type="module"></script>
+  <script src="landing.js" type="module"></script>
+</body>
+</html>

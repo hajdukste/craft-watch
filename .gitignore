@@ -1,0 +1,12 @@
+.env*
+node_modules/
+.DS_Store
+*.log
+.cache/
+tmp/
+screenshots/
+recordings/
+design/
+data/apps.json
+data/state.json
+data/apps.json.tmp

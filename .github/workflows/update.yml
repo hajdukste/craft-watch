@@ -1,0 +1,80 @@
+name: Update data
+
+on:
+  # Hourly while the repo is private (Actions minutes). Switch to '*/15 * * * *' when the repo goes public.
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  # Checks whether saved state exists. With no state, the collect job gets 20 minutes for the full first fetch.
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      cold: ${{ steps.state.outputs.cache-hit != 'true' }}
+    steps:
+      - id: state
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: data/state.json
+          key: state-v3-${{ github.run_id }}
+          restore-keys: state-v3-
+          lookup-only: true
+
+  collect:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ needs.plan.outputs.cold == 'true' && 20 || 5 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Saved state from the previous run: the collector fetches only what changed since then.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: data/state.json
+          key: state-v3-${{ github.run_id }}
+          restore-keys: state-v3-
+
+      - name: Collect public GitHub data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run collect
+
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: always() && hashFiles('data/state.json') != ''
+        with:
+          path: data/state.json
+          key: state-v3-${{ github.run_id }}
+
+      # The site gets this data through an artifact, not a commit.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: craft-watch-data
+          path: data/apps.json
+          retention-days: 2
+
+      - name: Commit the daily history file (only when it is new)
+        run: |
+          if [ -n "$(git status --porcelain data/history)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/history
+            git commit -m "Daily snapshot $(date -u +%F)"
+            git pull --rebase --quiet
+            git push --quiet
+          else
+            echo "No new history file today."
+          fi
