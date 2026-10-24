@@ -313,6 +313,7 @@ function placeReleases(lanes) {
   for (const l of lanes) {
     for (const release of l.app.releases_recent ?? []) {
       if (!inScale(release.published_at)) continue;
+      if (Date.parse(release.published_at) < view.start) continue; // the list keeps older releases for the version picker
       const p = place(l.samples, release.published_at);
       if (p) candidates.push({ l, release, p, label: null });
     }
@@ -529,10 +530,10 @@ function renderTotals() {
   const sum = (read) => apps.reduce((total, app) => total + (read(app) ?? 0), 0);
   const items = [
     ['commits (code saves, 30 days)', sum((a) => a.commits?.total)],
-    ['proposed changes', sum((a) => a.pulls?.opened)],
-    ['accepted changes', sum((a) => a.pulls?.merged)],
-    ['new versions (7 days or 30)', sum((a) => a.releases?.in_window)],
-    ['published advisories', sum((a) => a.advisories?.in_window)],
+    ['proposed changes (30 days)', sum((a) => a.pulls?.opened)],
+    ['accepted changes (30 days)', sum((a) => a.pulls?.merged)],
+    ['new versions (30 days)', sum((a) => a.releases?.in_window)],
+    ['published advisories (30 days)', sum((a) => a.advisories?.in_window)],
     ['open reports (open issues)', sum((a) => a.issues?.open_now)],
   ];
   const nodes = items.map(([label, value]) => {

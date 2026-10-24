@@ -264,7 +264,7 @@ function matches(p, s) {
 // The status of each step, from the data only. "Shipped" needs a release published after the merge.
 function journeySteps(p) {
   const release = p.m !== null ? releaseAfter(p.m) : null;
-  const passed = p.checks_total > 0
+  const passed = p.light ? 'checks not loaded for this older change' : p.checks_total > 0
     ? (p.checks_passed !== null ? `checks ${p.checks_passed}/${p.checks_total} passed` : `${p.checks_total} checks`)
     : 'no checks recorded';
   const selfMerged = p.merged_by && p.author ? (p.merged_by === p.author ? 'yes' : 'no') : 'not found';
@@ -303,7 +303,7 @@ function plainSteps(p) {
     ...base,
     suggested: { title: '1 · Someone suggests a change', sub: `suggested ${timeFmt.format(p.c)}` },
     reviewed: { title: '2 · Checked by people', sub: p.approvals > 0 ? `${p.approvals} ${p.approvals === 1 ? 'approval' : 'approvals'} recorded` : 'no approval recorded' },
-    tested: { title: '3 · Tested by robots', sub: p.checks_total > 0 ? `${p.checks_passed ?? '?'} of ${p.checks_total} robot checks passed` : 'no robot checks recorded' },
+    tested: { title: '3 · Tested by robots', sub: p.light ? 'robot checks not loaded for this older change' : p.checks_total > 0 ? `${p.checks_passed ?? '?'} of ${p.checks_total} robot checks passed` : 'no robot checks recorded' },
     merged: { title: '4 · Added to the app', sub: p.m !== null ? `added ${timeFmt.format(p.m)}` : p.x !== null ? 'closed, not added' : 'not added yet' },
     shipped: { title: '5 · In a new version', sub: base.release ? `in version ${base.release.label}` : p.m !== null ? 'waiting for next version' : 'not in a version yet' },
     install: { title: '6 · On your computer', sub: base.release ? 'once you download it' : 'nothing to install yet' },
@@ -539,9 +539,13 @@ function heroXray(svg, p) {
     ['head', 'THE CHANGE'],
     [p.approvals > 0 ? '✓' : '?', p.approvals > 0 ? `${p.approvals} approval${p.approvals === 1 ? '' : 's'} recorded` : 'no approvals recorded'],
     ...selfMergeLines(selfMerged),
-    [p.checks_total > 0 && p.checks_passed !== null ? (p.checks_passed === p.checks_total ? '✓' : '⚑') : '?', `required checks ${p.checks_passed ?? '?'}/${p.checks_total} passed`],
-    ...dependencyLines(p),
-    [p.workflow_touched ? '⚑' : '✓', p.workflow_touched ? 'CI workflow files touched' : 'no CI workflow files touched'],
+    ...(p.light
+      ? [['?', 'checks and files: not loaded for this older change']]
+      : [
+        [p.checks_total > 0 && p.checks_passed !== null ? (p.checks_passed === p.checks_total ? '✓' : '⚑') : '?', `required checks ${p.checks_passed ?? '?'}/${p.checks_total} passed`],
+        ...dependencyLines(p),
+        [p.workflow_touched ? '⚑' : '✓', p.workflow_touched ? 'CI workflow files touched' : 'no CI workflow files touched'],
+      ]),
     ['head', `THE RELEASE ${release ? release.label : '· not shipped yet'}`],
     [release ? (release.has_checksums ? '✓' : '?') : '?', release ? `checksums ${release.has_checksums ? 'published' : 'not found'}` : 'checksums: not shipped yet'],
     ['?', 'built by CI from the tagged commit: not found'],
@@ -792,7 +796,11 @@ function renderLanes() {
 
   svg.append(el('line', { x1: xFor(view.asOf), y1: 40, x2: xFor(view.asOf), y2: height - 8, stroke: '#FFFFFF', 'stroke-opacity': 0.4, 'stroke-dasharray': '4 6' }));
   const note = $('#shown');
-  note.textContent = `Showing ${rows.length} of ${view.filtered.length} changes in this range${view.filtered.length > ROWS_MAX ? ' (newest first)' : ''}. Checks show the latest result.`;
+  const complete = Date.parse(view.app.coverage?.pulls_complete_from ?? '');
+  const filling = Number.isFinite(complete) && complete > view.from
+    ? ` Still filling in: complete from ${shortDayFmt.format(complete)}, older days are being added.`
+    : '';
+  note.textContent = `Showing ${rows.length} of ${view.filtered.length} changes in this range${view.filtered.length > ROWS_MAX ? ' (newest first)' : ''}. Checks show the latest result.${filling}`;
   if (view.app.truncated?.pulls) {
     note.textContent += ' Only the newest 300 pull requests per app are kept, so older changes in a long range are missing.';
   }

@@ -10,85 +10,99 @@
       "name": "ArtCraft",
       "repo": "storytold/artcraft",
       "colour": "#E879F9",
-      "download": "https://github.com/storytold/artcraft/releases"
+      "download": "https://github.com/storytold/artcraft/releases",
+      "day_one": "2026-09-26T11:14:22Z"
     },
     {
       "name": "PhotoCraft",
       "repo": "storytold/photocraft",
       "colour": "#60A5FA",
-      "download": "https://github.com/storytold/photocraft/releases"
+      "download": "https://github.com/storytold/photocraft/releases",
+      "day_one": "2026-10-02T00:09:14Z"
     },
     {
       "name": "FilmCraft",
       "repo": "storytold/filmcraft",
       "colour": "#FB923C",
-      "download": "https://github.com/storytold/filmcraft/releases"
+      "download": "https://github.com/storytold/filmcraft/releases",
+      "day_one": "2026-10-02T22:31:33Z"
     },
     {
       "name": "PdfCraft",
       "repo": "storytold/pdfcraft",
       "colour": "#A78BFA",
-      "download": "https://github.com/storytold/pdfcraft/releases"
+      "download": "https://github.com/storytold/pdfcraft/releases",
+      "day_one": "2026-10-02T22:31:36Z"
     },
     {
       "name": "EffectCraft",
       "repo": "storytold/effectcraft",
       "colour": "#F472B6",
-      "download": "https://github.com/storytold/effectcraft/releases"
+      "download": "https://github.com/storytold/effectcraft/releases",
+      "day_one": "2026-10-02T22:31:37Z"
     },
     {
       "name": "FigCraft",
       "repo": "storytold/figcraft",
       "colour": "#2DD4BF",
-      "download": "https://github.com/storytold/figcraft/releases"
+      "download": "https://github.com/storytold/figcraft/releases",
+      "day_one": "2026-10-10T02:51:26Z"
     },
     {
       "name": "LightCraft",
       "repo": "storytold/lightcraft",
       "colour": "#FCD34D",
-      "download": "https://github.com/storytold/lightcraft/releases"
+      "download": "https://github.com/storytold/lightcraft/releases",
+      "day_one": "2026-10-02T22:31:34Z"
     },
     {
       "name": "VectorCraft",
       "repo": "storytold/vectorcraft",
       "colour": "#818CF8",
-      "download": "https://github.com/storytold/vectorcraft/releases"
+      "download": "https://github.com/storytold/vectorcraft/releases",
+      "day_one": "2026-10-02T22:31:32Z"
     },
     {
       "name": "DesignCraft",
       "repo": "storytold/designcraft",
       "colour": "#A3E635",
-      "download": "https://github.com/storytold/designcraft/releases"
+      "download": "https://github.com/storytold/designcraft/releases",
+      "day_one": "2026-10-02T22:31:38Z"
     },
     {
       "name": "WordCraft",
       "repo": "storytold/wordcraft",
       "colour": "#7DD3FC",
-      "download": "https://github.com/storytold/wordcraft/releases"
+      "download": "https://github.com/storytold/wordcraft/releases",
+      "day_one": "2026-10-07T22:35:41Z"
     },
     {
       "name": "GridCraft",
       "repo": "storytold/gridcraft",
       "colour": "#86EFAC",
-      "download": "https://github.com/storytold/gridcraft/releases"
+      "download": "https://github.com/storytold/gridcraft/releases",
+      "day_one": "2026-10-08T00:47:18Z"
     },
     {
       "name": "DeckCraft",
       "repo": "storytold/deckcraft",
       "colour": "#FDA4AF",
-      "download": "https://github.com/storytold/deckcraft/releases"
+      "download": "https://github.com/storytold/deckcraft/releases",
+      "day_one": "2026-10-08T00:23:17Z"
     },
     {
       "name": "CadCraft",
       "repo": "storytold/cadcraft",
       "colour": "#38BDF8",
-      "download": "https://github.com/storytold/cadcraft/releases"
+      "download": "https://github.com/storytold/cadcraft/releases",
+      "day_one": "2026-10-08T03:07:48Z"
     },
     {
       "name": "SoundCraft",
       "repo": "storytold/soundcraft",
       "colour": "#C084FC",
-      "download": "https://github.com/storytold/soundcraft/releases"
+      "download": "https://github.com/storytold/soundcraft/releases",
+      "day_one": "2026-10-08T14:41:51Z"
     },
     {
       "name": "AniCraft",
@@ -100,7 +114,9 @@
       "name": "CraftLauncher",
       "repo": "storytold/craft-launcher",
       "colour": "#CBD5E1",
-      "download": "https://github.com/storytold/craft-launcher/releases"
+      "download": "https://github.com/storytold/craft-launcher/releases",
+      "day_one": "2026-10-10T04:00:18Z"
     }
-  ]
+  ],
+  "_note_day_one": "day_one: the publish time of each app's first release as seen in our data on 24 Oct 2026 (ArtCraft: the launch release artcraft-v0.41.0). The landing headline counts commits since this date, so it never shrinks when the 30-day window moves on."
 }

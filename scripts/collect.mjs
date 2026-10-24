@@ -7,6 +7,11 @@ const ROOT = new URL('../', import.meta.url);
 const WINDOW_DAYS = 30;
 const PAGE_SIZE = 50;
 const MAX_PAGES = 6; // newest 300 PRs and 300 issues per repo; anything older is flagged as truncated
+const RELEASE_KEEP_DAYS = 120; // releases listed for the version picker and maps; counts still use the 30-day window
+// Backfill: PRs and issues the newest-first walk could not reach (a first full fetch, or a run with more than 300 updates)
+// are read later through search, one time slice at a time, a few calls per repo per run, until the gap is closed.
+const BACKFILL_CALLS = Number(process.env.BACKFILL_CALLS ?? 30);
+const SEARCH_CAP = 1000; // GitHub search returns at most 1000 results per query; bigger slices are split
 const CURSOR_MARGIN_MS = 5 * 60e3; // re-read a little before the last run to cover clock skew
 const DEPENDENCY_FILES = new Set([
   'Cargo.toml', 'Cargo.lock', 'package.json', 'package-lock.json', 'pnpm-lock.yaml',
@@ -52,6 +57,30 @@ const SUMMARY_QUERY = `query($owner: String!, $name: String!, $since: GitTimesta
 }`;
 
 // Counts only: commits on the default branch since a date, with no commit details.
+// Light records for the backfill: no files and no check runs (those are filled in when the item is next updated).
+const SEARCH_QUERY = `query($q: String!, $after: String) {
+  search(query: $q, type: ISSUE, first: 100, after: $after) {
+    issueCount
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      __typename
+      ... on PullRequest {
+        number title state isDraft createdAt updatedAt mergedAt closedAt reviewDecision url
+        author { __typename login }
+        mergedBy { login }
+        reviews(states: APPROVED) { totalCount }
+        labels(first: 10) { nodes { name } }
+      }
+      ... on Issue {
+        number title state createdAt updatedAt closedAt url
+        author { login }
+        labels(first: 10) { nodes { name } }
+        reactions(content: THUMBS_UP) { totalCount }
+      }
+    }
+  }
+}`;
+
 const COMMITS_SINCE_QUERY = `query($owner: String!, $name: String!, $since: GitTimestamp!) {
   repository(owner: $owner, name: $name) {
     defaultBranchRef {
@@ -178,6 +207,7 @@ function sawRetry(runs) {
 }
 
 function pullRecord(n) {
+  if (!n.files) return lightPullRecord(n);
   const paths = n.files.nodes.map((f) => f.path);
   return {
     number: n.number,
@@ -207,6 +237,78 @@ function pullRecord(n) {
     workflow_touched: paths.some((p) => p.startsWith('.github/workflows/')),
     dependency_touched: paths.some((p) => DEPENDENCY_FILES.has(p.split('/').pop())),
   };
+}
+
+// A PR read by the backfill: checks and touched files are unknown (null), never guessed.
+function lightPullRecord(n) {
+  return {
+    number: n.number,
+    title: n.title,
+    state: n.state,
+    is_draft: n.isDraft,
+    url: n.url,
+    author: n.author?.login ?? null,
+    author_type: n.author?.__typename ?? null,
+    created_at: n.createdAt,
+    updated_at: n.updatedAt,
+    merged_at: n.mergedAt,
+    closed_at: n.closedAt,
+    review_decision: n.reviewDecision,
+    labels: n.labels.nodes.map((l) => l.name),
+    checks: null,
+    checks_total: null,
+    checks_passed: null,
+    checks_retried: false,
+    approvals: n.reviews.totalCount,
+    merged_by: n.mergedBy?.login ?? null,
+    security_terms: SECURITY_TERMS.test([n.title, ...n.labels.nodes.map((l) => l.name)].join(' ')),
+    workflow_touched: null,
+    dependency_touched: null,
+    light: true,
+  };
+}
+
+const iso = (ms) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+// Gaps are [fromMs, toMs] ranges of updated_at that we have not read yet. Kept sorted, inside the window, no empty ones.
+function cleanGaps(gaps) {
+  return (gaps ?? [])
+    .map(([a, b]) => [Math.max(a, windowStart), b])
+    .filter(([a, b]) => b - a > 1000)
+    .sort((x, y) => y[1] - x[1]);
+}
+
+// Fills gaps newest first (recent days matter most), one slice per search. Stops at the call budget or on any error.
+// Returns the gaps still open.
+async function backfill(owner, name, kind, gaps, store, record, budget) {
+  const type = kind === 'pulls' ? 'pr' : 'issue';
+  let open = cleanGaps(gaps);
+  while (open.length && budget.calls > 0) {
+    const [from, to] = open[0];
+    let sliceFrom = Math.max(from, to - 24 * 3600e3);
+    let after = null;
+    let done = false;
+    while (!done && budget.calls > 0) {
+      const q = `repo:${owner}/${name} is:${type} updated:${iso(sliceFrom)}..${iso(to)}`;
+      budget.calls -= 1;
+      const result = (await graphql(SEARCH_QUERY, { q, after })).search;
+      if (after === null && result.issueCount > SEARCH_CAP && to - sliceFrom > 60e3) {
+        sliceFrom = to - (to - sliceFrom) / 2; // too many for one search: halve the slice and try again
+        continue;
+      }
+      for (const node of result.nodes) {
+        if (!node || !node.number) continue;
+        const known = store[node.number];
+        if (!known || Date.parse(known.updated_at) < Date.parse(node.updatedAt)) store[node.number] = record(node);
+      }
+      if (result.pageInfo.hasNextPage) after = result.pageInfo.endCursor;
+      else done = true;
+    }
+    if (!done) break; // budget ran out mid-slice: the same slice is read again next run
+    open[0] = [from, sliceFrom];
+    open = cleanGaps(open);
+  }
+  return open;
 }
 
 function issueRecord(n) {
@@ -245,13 +347,36 @@ async function collectApp(app, previous, runCursor) {
   const pulls = await fetchNewer(owner, name, PULLS_QUERY, 'pullRequests', stopAt);
   const issues = await fetchNewer(owner, name, ISSUES_QUERY, 'issues', stopAt);
 
+  // What the newest-first walk could not reach becomes a gap. State saved before backfill existed is re-read once
+  // over the whole window, because earlier runs may have left holes we cannot see.
+  const oldestUpdate = (nodes, fallback) => (nodes.length ? Math.min(...nodes.map((n) => Date.parse(n.updatedAt))) : fallback);
+  const startGaps = (kind, walk) => {
+    const gaps = previous?.gaps?.[kind] ? previous.gaps[kind].map(([a, b]) => [a, b]) : null;
+    const list = gaps ?? (previous ? [[windowStart, runStart]] : []);
+    if (walk.truncated) list.push([stopAt, oldestUpdate(walk.nodes, runStart)]);
+    return list;
+  };
+  const gapsIn = { pulls: startGaps('pulls', pulls), issues: startGaps('issues', issues) };
+
   // Keep what we already had, add or replace what changed, then drop anything older than the window.
   const prs = { ...previous?.prs };
   for (const node of pulls.nodes) prs[node.number] = pullRecord(node);
-  for (const [number, pr] of Object.entries(prs)) if (!inWindow(pr.updated_at)) delete prs[number];
   const iss = { ...previous?.issues };
   for (const node of issues.nodes) iss[node.number] = issueRecord(node);
+
+  // Backfill: shares one call budget per repo. A failure leaves the gaps for the next run and never fails the app.
+  const budget = { calls: previous ? BACKFILL_CALLS : BACKFILL_CALLS * 2 };
+  const gapsOut = { pulls: cleanGaps(gapsIn.pulls), issues: cleanGaps(gapsIn.issues) };
+  try {
+    gapsOut.pulls = await backfill(owner, name, 'pulls', gapsIn.pulls, prs, pullRecord, budget);
+    gapsOut.issues = await backfill(owner, name, 'issues', gapsIn.issues, iss, issueRecord, budget);
+  } catch (error) {
+    console.log(`note  ${app.repo}: backfill paused (${error.message})`);
+  }
+  for (const [number, pr] of Object.entries(prs)) if (!inWindow(pr.updated_at)) delete prs[number];
   for (const [number, issue] of Object.entries(iss)) if (!inWindow(issue.updated_at)) delete iss[number];
+  // Data is complete from the newest gap's end onwards; with no gaps, for the whole window.
+  const completeFrom = (gaps) => iso(gaps.length ? Math.max(...gaps.map(([, b]) => b)) : windowStart);
 
   const history = repo.defaultBranchRef?.target?.history;
   const commitMessages = history?.nodes.map((n) => n.message) ?? [];
@@ -263,14 +388,23 @@ async function collectApp(app, previous, runCursor) {
   const prsOpened = prList.filter((p) => inWindow(p.created_at));
   const issuesOpened = issueList.filter((i) => inWindow(i.created_at));
 
-  const releases = (await rest(`/repos/${owner}/${name}/releases?per_page=30`)) ?? [];
+  const releases = (await rest(`/repos/${owner}/${name}/releases?per_page=100`)) ?? [];
   const releasesInWindow = releases.filter((r) => !r.draft && inWindow(r.published_at));
-  const firstReleaseMs = releasesInWindow.length ? Math.min(...releasesInWindow.map((r) => Date.parse(r.published_at))) : null;
+  const keepFrom = runStart - RELEASE_KEEP_DAYS * 864e5;
+  const releasesKept = releases.filter((r) => !r.draft && r.published_at && Date.parse(r.published_at) >= keepFrom);
+  // Day one comes from repos.json when set, so the headline never moves when the window does.
+  const keptFirst = releasesKept.length ? Math.min(...releasesKept.map((r) => Date.parse(r.published_at))) : null;
+  const firstReleaseMs = app.day_one ? Date.parse(app.day_one) : keptFirst;
   const commitsSinceFirst = firstReleaseMs === null
     ? null
     : (await graphql(COMMITS_SINCE_QUERY, { owner, name, since: new Date(firstReleaseMs).toISOString() }))
       .repository?.defaultBranchRef?.target?.history?.totalCount ?? null;
   const latest = releases.find((r) => !r.draft) ?? null;
+  // The latest release is always listed, even when it is older than the kept range.
+  if (latest && !releasesKept.includes(latest)) releasesKept.push(latest);
+  // Exact commits in the last 24 hours (commit_times holds only the newest 100).
+  const commits24h = (await graphql(COMMITS_SINCE_QUERY, { owner, name, since: new Date(runStart - 24 * 3600e3).toISOString() }))
+    .repository?.defaultBranchRef?.target?.history?.totalCount ?? null;
 
   const advisories = await rest(`/repos/${owner}/${name}/security-advisories?per_page=100`);
   const advisoriesInWindow = (advisories ?? []).filter((a) => inWindow(a.published_at));
@@ -288,8 +422,15 @@ async function collectApp(app, previous, runCursor) {
       pulls: pulls.truncated,
       issues: issues.truncated,
     },
+    // PRs and issues are complete from these times on; earlier days are still being filled in when they are later than the window start.
+    coverage: {
+      window_start: iso(windowStart),
+      pulls_complete_from: completeFrom(gapsOut.pulls),
+      issues_complete_from: completeFrom(gapsOut.issues),
+    },
     commits: {
       total: history?.totalCount ?? 0,
+      last_24h: commits24h,
       ai_tagged: aiTagged,
       ai_tagged_pct: commitMessages.length ? Math.round((aiTagged / commitMessages.length) * 100) : null,
     },
@@ -358,6 +499,7 @@ async function collectApp(app, previous, runCursor) {
       approvals: p.approvals,
       merged_by: p.merged_by,
       security_terms: p.security_terms,
+      ...(p.light ? { light: true } : {}),
     })),
     // Issues in the window, for "problems reported" and "fixed" this week.
     issues_recent: Object.values(iss).map((i) => ({
@@ -367,7 +509,7 @@ async function collectApp(app, previous, runCursor) {
       created_at: i.created_at,
       closed_at: i.closed_at,
     })),
-    releases_recent: releasesInWindow.map((r) => ({
+    releases_recent: releasesKept.map((r) => ({
       tag: r.tag_name,
       published_at: r.published_at,
       url: r.html_url,
@@ -379,7 +521,7 @@ async function collectApp(app, previous, runCursor) {
   return {
     output,
     rateLimit: summary.rateLimit.remaining,
-    repoState: { cursor: runCursor, prs, issues: iss, last_good: output },
+    repoState: { cursor: runCursor, prs, issues: iss, gaps: gapsOut, last_good: output },
   };
 }
 

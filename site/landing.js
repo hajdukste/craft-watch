@@ -18,30 +18,13 @@ function el(tag, attrs = {}, text) {
   return node;
 }
 
-// Commit timestamps (newest 100 per app) and pull request open and merge times.
-function timestamps(app) {
-  const commits = (app.commit_times ?? []).map((iso) => Date.parse(iso));
-  const pulls = (app.pulls_recent ?? []).flatMap((p) => [p.created_at, p.merged_at, p.closed_at].filter(Boolean).map((iso) => Date.parse(iso)));
-  const releases = (app.releases_recent ?? []).map((r) => Date.parse(r.published_at));
-  return [...commits, ...pulls, ...releases].filter(Number.isFinite);
-}
-
-// Changes in the last 24 hours: commits seen plus pull requests merged. Commits are the newest 100 per app, so this is a floor.
-function changesLast24h() {
-  return state.apps.reduce((total, app) => {
-    const commits = (app.commit_times ?? []).filter((iso) => Date.parse(iso) >= state.end - DAY).length;
-    const merged = (app.pulls_recent ?? []).filter((p) => p.merged_at && Date.parse(p.merged_at) >= state.end - DAY).length;
-    return total + commits + merged;
-  }, 0);
-}
-
 // Fastest version climb: the app with the most releases in the data, shown with its first and last version and the days between.
 function fastestClimb() {
   let best = null;
   for (const app of state.apps) {
     const releases = [...(app.releases_recent ?? [])]
       .map((r) => ({ ...r, t: Date.parse(r.published_at) }))
-      .filter((r) => Number.isFinite(r.t))
+      .filter((r) => Number.isFinite(r.t) && r.t >= state.end - 30 * DAY)
       .sort((a, b) => a.t - b.t);
     if (releases.length < 2) continue;
     const span = (releases[releases.length - 1].t - releases[0].t) / DAY;
@@ -103,12 +86,11 @@ function renderHero() {
   $('#total-changes').textContent = total.toLocaleString();
   $('#since-date').textContent = `since ${sinceDate}`;
 
-  // X: from the changes of the last 24 hours across the 8 main apps (commits seen plus pull requests merged).
-  const day = mains.reduce((sum, app) => {
-    const commits = (app.commit_times ?? []).filter((iso) => Date.parse(iso) >= state.end - DAY).length;
-    const merged = (app.pulls_recent ?? []).filter((p) => p.merged_at && Date.parse(p.merged_at) >= state.end - DAY).length;
-    return sum + commits + merged;
-  }, 0);
+  // X: commits in the last 24 hours across the 8 main apps, the same kind of change as N. Exact when the data has
+  // last_24h; older data falls back to the newest 100 commit times per app, which is a floor.
+  const day = mains.reduce((sum, app) => sum + (typeof app.commits?.last_24h === 'number'
+    ? app.commits.last_24h
+    : (app.commit_times ?? []).filter((iso) => Date.parse(iso) >= state.end - DAY).length), 0);
   $('#per-second').textContent = day > 0 ? String(Math.round(86400 / day)) : 'many';
 
   state.facts = [fastestClimb(), biggestBurst(), busiestToday()].filter(Boolean);
@@ -134,11 +116,11 @@ function showFact(index) {
   $('#fact-text').textContent = fact.text;
 }
 
-// Last hour of data: events in the hour before the newest update. It uses the data's own time, never the visitor's clock,
-// so it is right even when updates arrive hours apart; it pulses when a new update brings a different number.
+// Last hour of data: commits in the hour before the newest update, the same kind of change as the headline. It uses the
+// data's own time, never the visitor's clock, so it is right even when updates arrive hours apart; it pulses when it changes.
 function renderSince() {
   const from = state.end - 3600e3;
-  const count = state.apps.reduce((total, app) => total + timestamps(app).filter((t) => t > from && t <= state.end).length, 0);
+  const count = state.apps.reduce((total, app) => total + (app.commit_times ?? []).map((iso) => Date.parse(iso)).filter((t) => t > from && t <= state.end).length, 0);
   const node = $('#since-count');
   if (state.since !== null && count !== state.since) pulse(node);
   state.since = count;

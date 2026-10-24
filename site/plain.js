@@ -9,7 +9,7 @@ export const GROUPS = ['New', 'Fixed', 'Faster', 'Languages', 'Other changes'];
 export function plainTitle(title) {
   let t = (title ?? '').trim();
   t = t.replace(/^\[[^\]]+\]\s*/, '');
-  t = t.replace(/^[a-z]+(\([^)]*\))?!?:\s*/i, '');
+  t = t.replace(/^[a-z][a-z0-9]*(\([^)]*\))?!?:\s*/i, '');
   t = t.replace(/^M\d+[:\s-]+/i, '');
   t = t.replace(/\s*\(#\d+(?:,\s*#\d+)*\)/g, '');
   t = t.replace(/\s*#\d+\b/g, '');

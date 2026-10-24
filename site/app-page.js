@@ -31,6 +31,15 @@ function validGitHubUrl(url) {
   }
 }
 
+// When part of the last 7 days is still being filled in, say so next to the number. Empty when the data is complete.
+function fillingNote(kind) {
+  const from = Date.parse(view.app.coverage?.[`${kind}_complete_from`] ?? '');
+  if (!Number.isFinite(from) || from <= view.end - 7 * DAY) return '';
+  return ` Still filling in: complete from ${shortFmt.format(from)}, older days are being added, so this number will go up.`;
+}
+
+const plural = (n, one, many) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
 function listItems(items, empty) {
   const values = items.length ? items : [empty];
   return values.map((text) => {
@@ -184,7 +193,7 @@ function renderChanged() {
     'No releases in the last 30 days.',
   ));
   const merged = ctx.mergedSince(ctx.end - 7 * DAY).sort((a, b) => b.m - a.m);
-  $('#merged-count').textContent = `${merged.length} change(s) merged in the last 7 days. Newest first, up to 12 shown.`;
+  $('#merged-count').textContent = `${plural(merged.length, 'change', 'changes')} merged in the last 7 days. Newest first, up to 12 shown.${fillingNote('pulls')}`;
   const items = merged.slice(0, 12).map((p) => {
     const li = document.createElement('li');
     const link = document.createElement('a');
@@ -282,11 +291,11 @@ function weekGroup(p) {
 function renderBetter() {
   const week = weekFor(view.app, view.end);
   const share = week.reported ? Math.round((week.fixed / week.reported) * 100) : 0;
-  $('#better-line').textContent = `This week: ${week.reported} problems reported · ${week.fixed} closed`;
+  $('#better-line').textContent = `This week: ${plural(week.reported, 'problem', 'problems')} reported · ${week.fixed.toLocaleString()} closed`;
   $('#better-bar').style.width = `${Math.min(100, share)}%`;
-  $('#better-meaning').textContent = week.reported
-    ? `${share}% of this week's reports were closed (${MEANING.fixed}).`
-    : 'No new reports this week in our data.';
+  $('#better-meaning').textContent = (week.reported
+    ? `For every 100 new reports this week, ${share} reports were closed (new or older ones).`
+    : 'No new reports this week in our data.') + fillingNote('issues');
 }
 
 function render() {
