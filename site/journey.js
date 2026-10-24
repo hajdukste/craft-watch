@@ -6,7 +6,7 @@ import { plainTitle } from './plain.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const DAY = 24 * 3600e3;
 const HOUR = 3600e3;
-const STALE_MS = 2 * HOUR;
+const STALE_MS = 6 * HOUR; // GitHub can delay scheduled runs by a few hours
 const ROW_H = 22;
 const ROWS_MAX = 40;
 const X0 = 380; // the timeline starts here; left of it are the PR titles

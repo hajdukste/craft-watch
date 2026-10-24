@@ -15,7 +15,7 @@ const MODES = {
   day: { window: DAY, rate: DAY / 30e3, label: 'last 24 h, replayed in 30 s' },
   month: { window: 30 * DAY, rate: (30 * DAY) / 30e3, label: '30 days, replayed in 30 s' },
 };
-const STALE_MS = 2 * HOUR;
+const STALE_MS = 6 * HOUR; // GitHub can delay scheduled runs by a few hours
 const SAMPLES = 400;
 const ARC_CAP = 10; // most recent PRs per app
 const ARC_MIN_WIDTH = 15; // narrower arcs are not drawn; merges still get their dot

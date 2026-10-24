@@ -1,9 +1,9 @@
 name: Update data
 
 on:
-  # Every 15 minutes (public repo: standard runners are free).
+  # Asks for a run every 15 minutes, off the busy :00/:15 marks (GitHub may still delay scheduled runs by hours).
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
 
 permissions:

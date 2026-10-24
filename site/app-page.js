@@ -5,7 +5,7 @@ import { signalFor } from './wording.js';
 import { GROUPS, MEANING, groupOf, isPlainSentence, isUserFacing, plainTitle, weekFor } from './plain.js';
 
 const DAY = 24 * 3600e3;
-const STALE_MS = 2 * 3600e3;
+const STALE_MS = 6 * 3600e3; // GitHub can delay scheduled runs by a few hours
 const DEFAULT_APP = 'PhotoCraft';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MONO = 'JetBrains Mono, ui-monospace, monospace';
@@ -282,7 +282,7 @@ function weekGroup(p) {
 function renderBetter() {
   const week = weekFor(view.app, view.end);
   const share = week.reported ? Math.round((week.fixed / week.reported) * 100) : 0;
-  $('#better-line').textContent = `This week: ${week.reported} problems reported · ${week.fixed} fixed`;
+  $('#better-line').textContent = `This week: ${week.reported} problems reported · ${week.fixed} closed`;
   $('#better-bar').style.width = `${Math.min(100, share)}%`;
   $('#better-meaning').textContent = week.reported
     ? `${share}% of this week's reports were closed (${MEANING.fixed}).`

@@ -7,9 +7,8 @@ const HOUR = 3600e3;
 const MAIN_APPS = ['ArtCraft', 'PhotoCraft', 'FilmCraft', 'PdfCraft', 'EffectCraft', 'FigCraft', 'LightCraft', 'VectorCraft'];
 const FACT_MS = 5000;
 const REFRESH_MS = 300000;
-const openedAt = Date.now();
 const $ = (selector) => document.querySelector(selector);
-const state = { apps: [], end: 0, since: 0, total: null, facts: [], factIndex: 0 };
+const state = { apps: [], end: 0, since: null, total: null, facts: [], factIndex: 0 };
 const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
 
 function el(tag, attrs = {}, text) {
@@ -135,11 +134,15 @@ function showFact(index) {
   $('#fact-text').textContent = fact.text;
 }
 
-// Since you opened this page: events in the data newer than the moment this page opened. It never goes down.
+// Last hour of data: events in the hour before the newest update. It uses the data's own time, never the visitor's clock,
+// so it is right even when updates arrive hours apart; it pulses when a new update brings a different number.
 function renderSince() {
-  const count = state.apps.reduce((total, app) => total + timestamps(app).filter((t) => t > openedAt).length, 0);
-  state.since = Math.max(state.since, count);
-  $('#since-count').textContent = state.since.toLocaleString();
+  const from = state.end - 3600e3;
+  const count = state.apps.reduce((total, app) => total + timestamps(app).filter((t) => t > from && t <= state.end).length, 0);
+  const node = $('#since-count');
+  if (state.since !== null && count !== state.since) pulse(node);
+  state.since = count;
+  node.textContent = count.toLocaleString();
 }
 
 function renderWeekNews() {
@@ -200,6 +203,6 @@ load().catch((error) => {
   $('#since-date').textContent = 'Could not load the data right now. Try again in a minute.';
 });
 
-// Facts rotate every 5 seconds; the data is re-read every 2 minutes so "since you opened" can move when a real event lands.
+// Facts rotate every 5 seconds; the data is re-read every 2 minutes so "last hour of data" moves when a new update lands.
 setInterval(() => showFact(state.factIndex + 1), FACT_MS);
 setInterval(() => load().catch(() => {}), REFRESH_MS);
