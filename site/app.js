@@ -4,7 +4,7 @@ import { installDragZoom, validateZoom } from './drag-zoom.js';
 import { laneYAt, followLanePath } from './connector-path.js';
 import { selectArcs, connectorPRs } from './arc-selection.js';
 import { pointDetails } from './point-details.js';
-import { SYMBOLS, DEFAULT_APPEARANCE, normalizeAppearance, symbolOffset, arcDirection, resolutionEvent } from './appearance.js';
+import { SYMBOLS, GLOW_LEVELS, DEFAULT_APPEARANCE, normalizeAppearance, symbolOffset, arcDirection, resolutionEvent } from './appearance.js';
 import { normalizeRange, rangeStart, timePosition, pstMidnights } from './time-range.js';
 import { DEFAULT_LIMITS, normalizeLimits, limitCount, visibleRange } from './display-limits.js';
 import { createActivity, upperBound, timestamp, openItemsAt } from './activity.js';
@@ -44,6 +44,7 @@ const view = {
   latestRange: '30d',
   scaleFrom: 0,
   zoom: null,
+  previewRange: null,
   selected: new Set(),
   layers: new Set(LAYERS),
   limits: { ...DEFAULT_LIMITS },
@@ -227,6 +228,15 @@ function symbolNode(key, colour = SYMBOL_COLOURS[key], size = view.appearance[ke
   group.append(node);
   return group;
 }
+// Glow on line: translucent, additive markers, so a burst at one time brightens instead of hiding.
+function glow(node, key) {
+  const level = view.appearance[key].glow;
+  if (level) {
+    node.classList.add('glow');
+    node.style.setProperty('--glow-opacity', String(level / 100));
+  }
+  return node;
+}
 function symbolPoint(p, key) {
   return { ...p, y: p.y + symbolOffset(view.appearance[key]) };
 }
@@ -235,7 +245,7 @@ function commitNode(p, app) {
   holder.setAttribute('data-layer', 'commits');
   holder.append(symbolNode('commits', app.colour));
   inspectable(holder, { app, kind: 'commits', at: new Date(p.t).toISOString() });
-  return holder;
+  return glow(holder, 'commits');
 }
 
 // An opening is an event, independent of whether the PR remains open later.
@@ -245,7 +255,7 @@ function drawOpened(l) {
     if (!inScale(pr.created_at)) continue;
     const p = symbolPoint(place(l.samples, pr.created_at), 'opened');
     const link = el('a', { 'data-layer': 'opened', 'data-pr': pr.number, transform: `translate(${p.x} ${p.y})`, href: `https://github.com/${l.app.repo}/pull/${pr.number}`, target: '_blank', rel: 'noopener', 'aria-label': `${l.app.name} · PR #${pr.number} · created · ${pr.title}` });
-    link.append(symbolNode('opened'));
+    glow(link, 'opened').append(symbolNode('opened'));
     inspectable(link, { app: l.app, kind: 'opened', item: pr });
     addEvent(p.t, link, l.lane);
     l.openedEntries.push({ t: p.t, el: link, pr });
@@ -261,7 +271,7 @@ function drawResolutions(l) {
     const p = symbolPoint(place(l.samples, new Date(event.t).toISOString()), event.type);
     const label = `${l.app.name} · PR #${pr.number} · ${event.type === 'merged' ? 'merged' : 'closed without merging'} · ${pr.title}`;
     const link = el('a', { 'data-layer': event.type, transform: `translate(${p.x} ${p.y})`, href: `https://github.com/${l.app.repo}/pull/${pr.number}`, target: '_blank', rel: 'noopener', 'aria-label': label });
-    link.append(symbolNode(event.type));
+    glow(link, event.type).append(symbolNode(event.type));
     inspectable(link, { app: l.app, kind: event.type, item: pr });
     addEvent(event.t, link, l.lane);
     l[`${event.type}Entries`].push({ t: event.t, el: link, pr });
@@ -381,7 +391,7 @@ function updateOpenItems(l, t) {
       const label = `${l.app.name} · ${isPR ? 'PR' : 'Issue'} #${item.number} · open at displayed time · ${item.title}`;
       const link = el('a', { transform: `translate(${p.x} ${p.y + symbolOffset(view.appearance[layer.key])})`, href: `https://github.com/${l.app.repo}/${isPR ? 'pull' : 'issues'}/${item.number}`, target: '_blank', rel: 'noopener', 'aria-label': label });
       const marker = symbolNode(layer.key);
-      link.append(marker);
+      glow(link, layer.key).append(marker);
       inspectable(link, { app: l.app, kind: layer.key, item });
       return link;
     }));
@@ -440,7 +450,7 @@ function placeReleases(lanes) {
 
   for (const c of candidates) {
     const holder = el('a', { 'data-layer': 'releases', transform: `translate(${c.p.x} ${c.p.y + symbolOffset(view.appearance.releases)})`, href: `https://github.com/${c.l.app.repo}/releases/tag/${encodeURIComponent(c.release.tag)}`, target: '_blank', rel: 'noopener', 'aria-label': `${c.l.app.name} release ${c.release.tag}` });
-    holder.append(symbolNode('releases'));
+    glow(holder, 'releases').append(symbolNode('releases'));
     inspectable(holder, { app: c.l.app, kind: 'releases', item: c.release });
     if (view.releaseLabels === 'all') {
       holder.append(el('text', {
@@ -700,7 +710,8 @@ function prepareAppBreakdown(apps) {
 }
 
 function renderAppBreakdown() {
-  const rows = view.appActivity.map((entry) => ({ ...entry, counts: entry.activity.at(view.sim) }));
+  const preview = view.previewRange;
+  const rows = view.appActivity.map((entry) => ({ ...entry, counts: preview ? entry.activity.at(preview.to, preview.from) : entry.activity.at(view.sim) }));
   const maxima = Object.fromEntries(METRIC_KEYS.map((key) => [key, Math.max(1, ...rows.map(({ counts }) => counts[key] ?? 0))]));
   for (const { counts, cells } of rows) {
     for (const key of METRIC_KEYS) {
@@ -709,7 +720,10 @@ function renderAppBreakdown() {
       cells[key].bar.style.width = `${100 * (counts[key] ?? 0) / maxima[key]}%`;
     }
   }
-  $('#app-breakdown-scope').textContent = view.zoom ? 'Selected interval' : view.replay ? 'Following the playhead' : `Last ${latestDuration()}`;
+  $('.app-breakdown').classList.toggle('is-preview', Boolean(preview));
+  $('#app-breakdown-scope').title = preview ? `${detailTimeFmt.format(preview.from)} → ${detailTimeFmt.format(preview.to)}` : '';
+  $('.breakdown-table th.open').title = preview ? 'Estimated open PR backlog at the end of the drag selection. Other columns count events inside the selection.' : 'Open PR backlog at the displayed time.';
+  $('#app-breakdown-scope').textContent = preview ? 'Drag preview' : view.zoom ? 'Selected interval' : view.replay ? 'Following the playhead' : `Last ${latestDuration()}`;
 }
 
 const EVENT_LABELS = { opened: 'PR created', merged: 'PR merged', closed: 'PR closed unmerged', commits: 'Commit', releases: 'Release' };
@@ -975,6 +989,7 @@ function syncAppearance() {
     if (document.activeElement !== sizeInput) sizeInput.value = style.size;
     if (key !== 'arcs') {
       $(`#shape-${key}`).value = style.shape;
+      $(`#glow-${key}`).value = String(style.glow);
       const preview = $(`#preview-${key}`);
       preview.replaceChildren(symbolNode(key, SYMBOL_COLOURS[key], 16));
       const legend = document.querySelector(`[data-legend="${key}"] b`);
@@ -1012,16 +1027,16 @@ function buildAppearanceControls() {
     title.prepend(toggle);
     row.append(title);
     if (key === 'prs' || key === 'opened') row.append(html('small', { class: 'release-label-hint' }, key === 'prs' ? 'Current state: PRs still open at the displayed time.' : 'Creation events within this range. Points remain after the PR merges or closes.'));
-    for (const field of (key === 'arcs' ? ['mode', 'position', 'size', 'connectorShape', 'lineSize', 'bend'] : key === 'releases' ? ['shape', 'position', 'size', 'labelHeight'] : ['shape', 'position', 'size'])) {
+    for (const field of (key === 'arcs' ? ['mode', 'position', 'size', 'connectorShape', 'lineSize', 'bend'] : key === 'releases' ? ['shape', 'position', 'size', 'labelHeight', 'glow'] : ['shape', 'position', 'size', 'glow'])) {
       if (key === 'arcs' && field === 'shape') continue;
       const numeric = ['size', 'labelHeight', 'lineSize', 'bend'].includes(field);
-      const caption = field === 'connectorShape' ? 'Connector shape' : field === 'bend' ? 'Bend strength' : field === 'mode' ? 'Style' : field === 'lineSize' ? 'Line thickness' : field === 'labelHeight' ? 'Label height ×' : field === 'size' ? (key === 'arcs' ? 'Thickness' : 'Size') : field === 'shape' ? 'Symbol' : 'Position';
+      const caption = field === 'glow' ? 'Glow on line' : field === 'connectorShape' ? 'Connector shape' : field === 'bend' ? 'Bend strength' : field === 'mode' ? 'Style' : field === 'lineSize' ? 'Line thickness' : field === 'labelHeight' ? 'Label height ×' : field === 'size' ? (key === 'arcs' ? 'Thickness' : 'Size') : field === 'shape' ? 'Symbol' : 'Position';
       const label = html('label', { for: `${field}-${key}` }, caption);
       const input = numeric
         ? html('input', { id: `${field}-${key}`, type: 'number', min: field === 'bend' ? 0 : field === 'labelHeight' || key === 'arcs' ? 0.5 : 2, max: field === 'bend' ? 3 : field === 'labelHeight' ? 5 : key === 'arcs' ? 8 : 48, step: 'any', 'aria-label': `${names[key]} ${caption.toLowerCase()}` })
         : html('select', { id: `${field}-${key}`, 'aria-label': `${names[key]} ${caption.toLowerCase()}` });
       if (!numeric) {
-        const options = field === 'connectorShape' ? { straight: 'Straight', follow: 'Follow lane / S-curve' } : field === 'mode' ? { lifetime: 'PR lifetime arcs', connect: 'Creation → merge line' } : field === 'shape' ? SYMBOLS : { above: 'Above line', on: 'On line', below: 'Below line' };
+        const options = field === 'glow' ? GLOW_LEVELS : field === 'connectorShape' ? { straight: 'Straight', follow: 'Follow lane / S-curve' } : field === 'mode' ? { lifetime: 'PR lifetime arcs', connect: 'Creation → merge line' } : field === 'shape' ? SYMBOLS : { above: 'Above line', on: 'On line', below: 'Below line' };
         for (const [value, text] of Object.entries(options)) input.append(html('option', { value }, text));
       }
       input.addEventListener(numeric ? 'input' : 'change', () => {
@@ -1158,6 +1173,20 @@ function showFailure(message) {
 }
 
 let resumeAfterDrag = false;
+let previewFrame = 0;
+function previewAppCounts(range) {
+  view.previewRange = range;
+  if (!range) {
+    cancelAnimationFrame(previewFrame);
+    previewFrame = 0;
+    renderAppBreakdown();
+  } else if (!previewFrame) {
+    previewFrame = requestAnimationFrame(() => {
+      previewFrame = 0;
+      renderAppBreakdown();
+    });
+  }
+}
 function applyZoom(range, animate = true) {
   view.zoom = range;
   view.scaleFrom = range.from;
@@ -1177,10 +1206,11 @@ const dragZoom = installDragZoom(svg, {
   getRange: () => view.data && view.selected.size ? {from:view.scaleFrom,to:mapEnd(),left:TIME_START_X,right:END_X,top:mapLayout.axisTop,bottom:mapLayout.axisBottom} : null,
   onStart: () => { resumeAfterDrag = view.playing; view.playing = false; },
   onCancel: () => { view.playing = resumeAfterDrag; view.lastFrame = performance.now(); },
-  onPreview: text => {
+  onPreview: (text, range) => {
     $('#zoom-selection').hidden = !text;
     $('#zoom-state').hidden = Boolean(text);
     $('#zoom-selection').textContent = text ?? '';
+    previewAppCounts(range);
   },
   onSelect: range => applyZoom(range),
 });

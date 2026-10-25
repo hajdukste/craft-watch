@@ -28,7 +28,7 @@ export function installDragZoom(svg, {getRange, onStart, onCancel, onSelect, onP
     const previous = drag;
     drag = null;
     previous.overlay.remove();
-    onPreview(null);
+    onPreview(null, null);
     svg.classList.remove('selecting-time');
     if (svg.hasPointerCapture(previous.id)) svg.releasePointerCapture(previous.id);
     if (resume) onCancel();
@@ -41,7 +41,7 @@ export function installDragZoom(svg, {getRange, onStart, onCancel, onSelect, onP
     d.line.setAttribute('x2', current);
     d.endDot.setAttribute('cx', current);
     const selected = selectedTimeRange(d.x1, current, d.range.left, d.range.right, d.range.from, d.range.to);
-    onPreview(selected ? `${dateFmt.format(selected.from)} → ${dateFmt.format(selected.to)}` : 'Drag left or right to select time');
+    onPreview(selected ? `${dateFmt.format(selected.from)} → ${dateFmt.format(selected.to)}` : 'Drag left or right to select time', selected);
   }
   svg.addEventListener('pointerdown', event => {
     if (event.button !== 0 || !event.isPrimary || event.ctrlKey || event.metaKey || event.altKey) return;

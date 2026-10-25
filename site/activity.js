@@ -46,16 +46,18 @@ export function createActivity(apps, from, end) {
   const starts = Object.fromEntries(Object.entries(types).map(([key, list]) => [key, upperBound(list, from)]));
   return {
     events, incomplete, sampledCommits, openKnown,
-    at(time) {
+    at(time, intervalStart = from) {
       const t = Math.max(from, Math.min(end, time));
+      const windowStart = Math.max(from, Math.min(t, intervalStart));
+      const windowStarts = windowStart === from ? starts : Object.fromEntries(Object.entries(types).map(([key, list]) => [key, upperBound(list, windowStart)]));
       const positions = Object.fromEntries(Object.entries(types).map(([key, list]) => [key, upperBound(list, t)]));
-      const counts = Object.fromEntries(Object.keys(types).map((key) => [key, positions[key] - starts[key]]));
+      const counts = Object.fromEntries(Object.keys(types).map((key) => [key, positions[key] - windowStarts[key]]));
       // Work backwards from GitHub's open total. Reopen transitions are not collected,
       // so historical totals are always labelled estimates, even with complete coverage.
       const after = (key) => types[key].length - positions[key];
       const open = openKnown ? Math.max(0, openNow - after('opened') + after('merged') + after('closed')) : null;
       const cursor = upperBound(events, t);
-      return { ...counts, open, estimated: t < end, recent: events.slice(Math.max(0, cursor - 3), cursor), cursor };
+      return { ...counts, open, estimated: t < end, recent: events.slice(Math.max(0, cursor - 3), cursor).filter(event => event.t > windowStart), cursor };
     },
   };
 }

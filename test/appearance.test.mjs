@@ -7,7 +7,9 @@ test('appearance preferences reject unsafe shapes, positions and sizes', () => {
   assert.deepEqual(normalizeAppearance(null), DEFAULT_APPEARANCE);
   const styles = normalizeAppearance({ commits: { shape: '__proto__', position: 'elsewhere', size: Infinity }, merged: { shape: 'triangle', position: 'below', size: '24' }, arcs: { position: 'on', size: -1 } });
   assert.deepEqual(styles.commits, DEFAULT_APPEARANCE.commits);
-  assert.deepEqual(styles.merged, { shape: 'triangle', position: 'below', size: 24 });
+  assert.deepEqual(styles.merged, { shape: 'triangle', position: 'below', size: 24, glow: 0 });
+  assert.equal(normalizeAppearance({ merged: { glow: '25' } }).merged.glow, 25);
+  assert.equal(normalizeAppearance({ merged: { glow: 40 } }).merged.glow, 0);
   assert.deepEqual(styles.arcs, { position: 'on', size: 1.8, mode: 'lifetime', lineSize: 1.8, connectorShape: 'straight', bend: 1 });
   assert.equal(symbolOffset(styles.merged), 24);
   assert.equal(symbolOffset({ position: 'above', size: 24 }), -24);

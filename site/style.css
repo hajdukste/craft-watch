@@ -889,6 +889,9 @@ h2 {
 #point-title { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 #point-facts { color: var(--muted); font-size: 11px; line-height: 1.5; }
 #space [data-inspect] { cursor: pointer; }
+/* Glow on line: stacked markers add up instead of hiding each other; labels stay opaque. */
+#space .glow { mix-blend-mode: plus-lighter; }
+#space .glow .event-symbol { opacity: var(--glow-opacity); }
 #space .inspected .event-symbol, #space [data-inspect]:focus-visible .event-symbol { filter: drop-shadow(0 0 4px #fff); }
 #space .inspected .pr-arc { stroke-opacity: 1; }
 @media (max-width: 760px) {
@@ -1014,3 +1017,7 @@ h2 {
 }
 
 .midnight-key { margin-left:12px; color:var(--muted); font-size:10px; letter-spacing:0; text-transform:none; }
+
+.app-breakdown.is-preview { border-color:#79629f; }
+.app-breakdown.is-preview .breakdown-range { background:#b6a3ff22; color:#e8ddff; }
+.app-breakdown.is-preview .breakdown-track>span { transition:none; }

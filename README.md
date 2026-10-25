@@ -77,3 +77,5 @@ npm test              # replay accounting and data-boundary checks
 - Combined totals and the per-app table follow the selected range, zoom, and replay time, independently of map display limits.
 - The timeline fits app names against the right edge and grows taller as more apps are selected. The legend sits in its upper-left corner. Selection dates appear in the fixed map header during a drag.
 - Faint vertical guides mark daily midnight in fixed PST (UTC−8). They follow the displayed interval and full map height.
+
+- While dragging a time selection, the per-app table previews counts inside that interval and marks itself “Drag preview.” Open PRs remain an estimated backlog at the selection’s endpoint. Release commits the zoom; Escape or a cancelled drag restores the prior counts. Indexed timestamp lookups keep preview updates light even with many apps.
