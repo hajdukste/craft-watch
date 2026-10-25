@@ -627,7 +627,7 @@ if (enoughToPublish) {
     window_days: WINDOW_DAYS,
     graphql_rate_limit_remaining: rateLimit,
     apps: results,
-  }, null, 2) + '\n');
+  }) + '\n');
   await rename(tmpPath, outPath);
 } else {
   console.error(`Only ${succeeded} of ${results.length} apps refreshed. apps.json was not replaced; the previous data stays.`);

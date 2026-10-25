@@ -1,3 +1,4 @@
+import { loadApps } from './data.js';
 // App page, laid out like design/Main.dc.html. Every number and verdict comes from data/apps.json via verdicts.js.
 // A card is hidden when its number cannot be measured. Everything from GitHub is written with textContent or validated links.
 import { context, updateVerdict, versionVerdict, statCards, isAdvisoryNamed, isGhsa } from './verdicts.js';
@@ -328,11 +329,7 @@ $('#app-pick').addEventListener('change', (event) => {
 });
 $('#version').addEventListener('change', renderVersion);
 
-fetch('data/apps.json', { cache: 'no-store' })
-  .then((res) => {
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  })
+loadApps()
   .then(init)
   .catch((error) => {
     $('#status').classList.add('warn');

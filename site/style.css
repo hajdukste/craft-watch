@@ -375,7 +375,6 @@ body {
 .app-btn,
 .more,
 .watch,
-.unwatch,
 .landing-card a.open {
   min-height: 56px;
   padding: 12px 18px;
@@ -462,13 +461,10 @@ body {
   transform: translateX(-50%);
 }
 
-.unwatch {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 4;
-  min-height: 40px;
-  font-size: 14px;
+/* Sits in the controls row (first button), so it never covers the other controls. */
+.controls .unwatch {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .hero.watching .unwatch {

@@ -1,3 +1,4 @@
+import { loadApps } from './data.js';
 // Landing: how fast the ArtCraft apps change. Every number and fact is computed from data/apps.json.
 import { plainTitle, weekFor } from './plain.js';
 import { version } from './verdicts.js';
@@ -6,7 +7,7 @@ const DAY = 24 * 3600e3;
 const HOUR = 3600e3;
 const MAIN_APPS = ['ArtCraft', 'PhotoCraft', 'FilmCraft', 'PdfCraft', 'EffectCraft', 'FigCraft', 'LightCraft', 'VectorCraft'];
 const FACT_MS = 5000;
-const REFRESH_MS = 300000;
+const REFRESH_MS = 10 * 60e3; // data updates a few times a day; a cheap 304 when nothing changed
 const $ = (selector) => document.querySelector(selector);
 const state = { apps: [], end: 0, since: null, total: null, facts: [], factIndex: 0 };
 const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
@@ -171,12 +172,12 @@ $('#month').addEventListener('click', () => {
   document.querySelector('[data-mode="month"]').click();
 });
 
+let first = true;
 function load() {
-  return fetch('data/apps.json', { cache: 'no-store' })
-    .then((res) => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    })
+  const wasFirst = first;
+  first = false;
+  if (!wasFirst && document.visibilityState !== 'visible') return Promise.resolve();
+  return loadApps({ fresh: !wasFirst })
     .then(render);
 }
 
@@ -185,6 +186,6 @@ load().catch((error) => {
   $('#since-date').textContent = 'Could not load the data right now. Try again in a minute.';
 });
 
-// Facts rotate every 5 seconds; the data is re-read every 2 minutes so "last hour of data" moves when a new update lands.
+// Facts rotate every 5 seconds; the data is re-checked every 10 minutes so "last hour of data" moves when a new update lands.
 setInterval(() => showFact(state.factIndex + 1), FACT_MS);
 setInterval(() => load().catch(() => {}), REFRESH_MS);

@@ -1,3 +1,4 @@
+import { loadApps } from './data.js';
 import { updateVerdict } from './verdicts.js';
 // Space view: one ArtCraft core, one lane per app, events placed by time.
 // Live shows the last 30 days on a stretched time scale. Replays zoom the lanes to their own window.
@@ -581,7 +582,10 @@ function setMode(mode) {
   }
   markModeButtons();
   writeUrl();
-  if (view.data) renderClock();
+  if (view.data) {
+    renderClock();
+    startLoop();
+  }
 }
 
 // Toggling apps keeps the current mode and clock.
@@ -604,6 +608,14 @@ function frame(now) {
   showUntil(view.sim);
   setHead(view.sim);
   renderClock();
+  if (view.replay) requestAnimationFrame(frame);
+  else view.looping = false;
+}
+
+function startLoop() {
+  if (view.looping || !view.replay) return;
+  view.looping = true;
+  view.lastFrame = performance.now();
   requestAnimationFrame(frame);
 }
 
@@ -622,7 +634,7 @@ function build(data) {
   renderMoreButton();
   renderStatus();
   setInterval(renderStatus, 30e3);
-  requestAnimationFrame(frame);
+  startLoop();
 }
 
 function showFailure(message) {
@@ -640,10 +652,6 @@ $('#more').addEventListener('click', () => setShowAll(!view.showAll));
 window.addEventListener('resize', fitStage);
 fitStage();
 markModeButtons();
-fetch('data/apps.json', { cache: 'no-store' })
-  .then((res) => {
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  })
+loadApps()
   .then(build)
   .catch((error) => showFailure(`Could not load the data (${error.message}).`));

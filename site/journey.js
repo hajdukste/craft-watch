@@ -1,3 +1,4 @@
+import { loadApps } from './data.js';
 import { FOOTER, advisoryRef, signalFor } from './wording.js';
 import { plainTitle } from './plain.js';
 // Journey view for one app. The top is the six-step journey of one change: the featured one, or the row picked below.
@@ -953,11 +954,7 @@ for (const box of document.querySelectorAll('input[type="checkbox"]')) box.addEv
 $('#scrub').addEventListener('input', onScrub);
 $('#now').addEventListener('click', resetScrub);
 
-fetch('data/apps.json', { cache: 'no-store' })
-  .then((res) => {
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  })
+loadApps()
   .then(init)
   .catch((error) => {
     $('#status').classList.add('warn');
