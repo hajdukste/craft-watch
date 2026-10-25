@@ -8,6 +8,9 @@ import { SYMBOLS, GLOW_LEVELS, DEFAULT_APPEARANCE, normalizeAppearance, symbolOf
 import { normalizeRange, rangeStart, timePosition, pstMidnights } from './time-range.js';
 import { DEFAULT_LIMITS, normalizeLimits, limitCount, visibleRange } from './display-limits.js';
 import { createActivity, upperBound, timestamp, openItemsAt } from './activity.js';
+import { orderApps, dropIndex, moveItem, reorderNames, normalizeOrder } from './lane-order.js';
+import { createTrack, showRange } from './event-track.js';
+import { createGlowLayer } from './glow-layer.js';
 // Space view: one ArtCraft core, one lane per app, events placed by time.
 // Latest and replay views use an evenly spaced time scale over their selected window.
 // Everything from GitHub is written with textContent or attributes, never as HTML.
@@ -46,6 +49,7 @@ const view = {
   zoom: null,
   previewRange: null,
   selected: new Set(),
+  order: null,
   layers: new Set(LAYERS),
   limits: { ...DEFAULT_LIMITS },
   releaseLabels: 'all',
@@ -57,10 +61,9 @@ const view = {
   playing: false,
   lastUI: 0,
   lastFeed: null,
-  events: [],
-  shown: 0,
   lastFrame: performance.now(),
   headLine: null,
+  glowLayer: null,
 };
 
 const mapEnd = () => view.zoom?.to ?? view.end;
@@ -133,11 +136,19 @@ function inScale(iso) {
   return Number.isFinite(t) && t >= view.scaleFrom && t <= mapEnd();
 }
 
-function addEvent(t, node, group) {
-  node.classList.add('evt');
-  node.style.display = 'none';
-  group.append(node);
-  view.events.push({ t, el: node });
+// Events are kept as records; showUntil builds nodes only for those inside the display limits.
+// Each layer gets its own group, so layers keep their stacking order as nodes come and go.
+function addTrack(l, key, records, make) {
+  const group = el('g', {});
+  l.lane.append(group);
+  const track = createTrack(key, records, (record) => {
+    const node = make(record);
+    node.classList.add('evt');
+    return node;
+  }, group);
+  track.capped = key in view.limits;
+  l.tracks.push(track);
+  l[`${key}Entries`] = track.records;
 }
 
 const inspectionData = new WeakMap();
@@ -179,7 +190,7 @@ function refreshInspection() {
 function inspectPoint(event) {
   if (svg.classList.contains('selecting-time')) return;
   const node = event.target.closest('[data-inspect]');
-  if (!node || !svg.contains(node)) return;
+  if (!node || !svg.contains(node) || node === inspectedNode) return;
   inspectedNode?.classList.remove('inspected');
   inspectedNode = node;
   node.classList.add('inspected');
@@ -251,30 +262,38 @@ function commitNode(p, app) {
 // An opening is an event, independent of whether the PR remains open later.
 function drawOpened(l) {
   if (!view.layers.has('opened')) return;
+  const records = [];
   for (const pr of sampled(l.app, 'opened', l.app.pulls_recent ?? [], pr => pr.number)) {
-    if (!inScale(pr.created_at)) continue;
+    if (inScale(pr.created_at)) records.push({ t: Date.parse(pr.created_at), pr });
+  }
+  addTrack(l, 'opened', records, ({ pr }) => {
     const p = symbolPoint(place(l.samples, pr.created_at), 'opened');
     const link = el('a', { 'data-layer': 'opened', 'data-pr': pr.number, transform: `translate(${p.x} ${p.y})`, href: `https://github.com/${l.app.repo}/pull/${pr.number}`, target: '_blank', rel: 'noopener', 'aria-label': `${l.app.name} · PR #${pr.number} · created · ${pr.title}` });
     glow(link, 'opened').append(symbolNode('opened'));
     inspectable(link, { app: l.app, kind: 'opened', item: pr });
-    addEvent(p.t, link, l.lane);
-    l.openedEntries.push({ t: p.t, el: link, pr });
-  }
+    return link;
+  });
 }
 
 // Resolutions are independent events, even when arcs are hidden or capped.
 function drawResolutions(l) {
   const allowed = Object.fromEntries(['merged', 'closed'].map(key => [key, new Set(sampled(l.app, key, l.app.pulls_recent ?? [], pr => pr.number).map(pr => pr.number))]));
+  const records = { merged: [], closed: [] };
   for (const pr of l.app.pulls_recent ?? []) {
     const event = resolutionEvent(pr);
     if (!event || !allowed[event.type].has(pr.number) || !view.layers.has(event.type) || event.t < view.scaleFrom || event.t > mapEnd()) continue;
-    const p = symbolPoint(place(l.samples, new Date(event.t).toISOString()), event.type);
-    const label = `${l.app.name} · PR #${pr.number} · ${event.type === 'merged' ? 'merged' : 'closed without merging'} · ${pr.title}`;
-    const link = el('a', { 'data-layer': event.type, transform: `translate(${p.x} ${p.y})`, href: `https://github.com/${l.app.repo}/pull/${pr.number}`, target: '_blank', rel: 'noopener', 'aria-label': label });
-    glow(link, event.type).append(symbolNode(event.type));
-    inspectable(link, { app: l.app, kind: event.type, item: pr });
-    addEvent(event.t, link, l.lane);
-    l[`${event.type}Entries`].push({ t: event.t, el: link, pr });
+    records[event.type].push({ t: event.t, pr });
+  }
+  for (const type of ['merged', 'closed']) {
+    if (!view.layers.has(type)) continue;
+    addTrack(l, type, records[type], ({ t, pr }) => {
+      const p = symbolPoint(place(l.samples, new Date(t).toISOString()), type);
+      const label = `${l.app.name} · PR #${pr.number} · ${type === 'merged' ? 'merged' : 'closed without merging'} · ${pr.title}`;
+      const link = el('a', { 'data-layer': type, transform: `translate(${p.x} ${p.y})`, href: `https://github.com/${l.app.repo}/pull/${pr.number}`, target: '_blank', rel: 'noopener', 'aria-label': label });
+      glow(link, type).append(symbolNode(type));
+      inspectable(link, { app: l.app, kind: type, item: pr });
+      return link;
+    });
   }
 }
 
@@ -288,19 +307,15 @@ function createLane(app, index, count, defs, group) {
   defs.append(gradient(`lane-${index}`, colour, [[0, 0.1], [0.3, 1], [1, 0.9]]));
   lane.append(el('path', { d, stroke: colour, 'stroke-width': 12, 'stroke-opacity': 0.12, fill: 'none', filter: 'url(#bloom)' }), line);
   group.append(lane);
-  return { app, index, count, y, colour, compact: count > MAIN_APPS.length, commitEntries: [], releaseEntries: [], openedEntries: [], mergedEntries: [], closedEntries: [], samples: sampleLane(line), lane, defs };
+  return { app, index, count, y, colour, compact: count > MAIN_APPS.length, tracks: [], openedEntries: [], mergedEntries: [], samples: sampleLane(line), lane, defs };
 }
 
 function drawCommits(l) {
+  const records = [];
   for (const iso of sampled(l.app, 'commits', l.app.commit_times ?? [], iso => iso)) {
-    if (!inScale(iso)) continue;
-    const p = place(l.samples, iso);
-    if (p) {
-      const node = commitNode(p, l.app);
-      addEvent(p.t, node, l.lane);
-      l.commitEntries.push({ t: p.t, el: node });
-    }
+    if (inScale(iso)) records.push({ t: Date.parse(iso), iso });
   }
+  addTrack(l, 'commits', records, ({ iso }) => commitNode(place(l.samples, iso), l.app));
 }
 
 // Keep a small set of arcs near the most recent PR activity at the displayed time.
@@ -385,6 +400,7 @@ function updateOpenItems(l, t) {
     const signature = items.map((item) => item.number).join(',');
     if (signature === layer.signature) continue;
     layer.signature = signature;
+    if (view.appearance[layer.key].glow) view.glowLayer?.invalidate();
     layer.group.replaceChildren(...items.map((item) => {
       const p = place(l.samples, item.created_at);
       const isPR = layer.key === 'prs';
@@ -398,83 +414,175 @@ function updateOpenItems(l, t) {
   }
 }
 
+// Advisories are few and never capped, so each record builds its own node.
 function drawAdvisories(l) {
+  const records = [];
   for (const advisory of l.app.advisories?.items ?? []) {
     if (!inScale(advisory.published_at)) continue;
     const from = place(l.samples, advisory.published_at);
     if (!from) continue;
     const fix = fixedRelease(advisory, (l.app.releases_recent ?? []).filter(release => timestamp(release.published_at) <= mapEnd()));
     const to = fix ? place(l.samples, fix.published_at) : { x: END_X, y: yOnLane(l.samples, END_X), t: mapEnd() };
-    const group = el('g', {});
-    group.append(el('path', {
-      d: linePath(l.samples, from.x, to.x),
-      fill: 'none',
-      stroke: '#EF4444',
-      'stroke-width': 3,
-      'stroke-opacity': 0.85,
-      'stroke-dasharray': '6 6',
-      filter: 'url(#bloom)',
-    }));
-    const ring = translate(from);
-    ring.append(
-      el('circle', { class: 'ring', r: 10, fill: 'none', stroke: '#EF4444', 'stroke-width': 2.5 }),
-      el('text', { x: 0, y: -18, 'text-anchor': 'middle', fill: '#FCA5A5', 'font-size': 13, 'font-weight': 800 },
-        `advisory ${advisory.ghsa ?? ''}`.trim()),
-    );
-    group.append(ring);
-    addEvent(from.t, group, l.lane);
+    records.push({ t: from.t, build: () => {
+      const group = el('g', {});
+      group.append(el('path', {
+        d: linePath(l.samples, from.x, to.x),
+        fill: 'none',
+        stroke: '#EF4444',
+        'stroke-width': 3,
+        'stroke-opacity': 0.85,
+        'stroke-dasharray': '6 6',
+        filter: 'url(#bloom)',
+      }));
+      const ring = translate(from);
+      ring.append(
+        el('circle', { class: 'ring', r: 10, fill: 'none', stroke: '#EF4444', 'stroke-width': 2.5 }),
+        el('text', { x: 0, y: -18, 'text-anchor': 'middle', fill: '#FCA5A5', 'font-size': 13, 'font-weight': 800 },
+          `advisory ${advisory.ghsa ?? ''}`.trim()),
+      );
+      group.append(ring);
+      return group;
+    } });
 
     if (fix) {
-      const fixed = translate(to);
-      fixed.append(
-        el('circle', { r: 10, fill: 'none', stroke: '#22C55E', 'stroke-width': 3 }),
-        el('text', { x: 0, y: -18, 'text-anchor': 'middle', fill: '#86EFAC', 'font-size': 13, 'font-weight': 800 }, `${version(fix.tag)} · fixed`),
-      );
-      addEvent(to.t, fixed, l.lane);
+      records.push({ t: to.t, build: () => {
+        const fixed = translate(to);
+        fixed.append(
+          el('circle', { r: 10, fill: 'none', stroke: '#22C55E', 'stroke-width': 3 }),
+          el('text', { x: 0, y: -18, 'text-anchor': 'middle', fill: '#86EFAC', 'font-size': 13, 'font-weight': 800 }, `${version(fix.tag)} · fixed`),
+        );
+        return fixed;
+      } });
     }
   }
+  addTrack(l, 'advisories', records, (record) => record.build());
 }
 
 // Every displayed release star gets a label when enabled, regardless of overlap.
 function placeReleases(lanes) {
-  const candidates = [];
   for (const l of lanes) {
+    const records = [];
     for (const release of sampled(l.app, 'releases', l.app.releases_recent ?? [], release => release.tag)) {
       if (!inScale(release.published_at)) continue;
       if (Date.parse(release.published_at) < view.start) continue; // the list keeps older releases for the version picker
+      records.push({ t: Date.parse(release.published_at), release });
+    }
+    addTrack(l, 'releases', records, ({ release }) => {
       const p = place(l.samples, release.published_at);
-      if (p) candidates.push({ l, release, p });
-    }
-  }
-  candidates.sort((a, b) => b.p.t - a.p.t);
-
-  for (const c of candidates) {
-    const holder = el('a', { 'data-layer': 'releases', transform: `translate(${c.p.x} ${c.p.y + symbolOffset(view.appearance.releases)})`, href: `https://github.com/${c.l.app.repo}/releases/tag/${encodeURIComponent(c.release.tag)}`, target: '_blank', rel: 'noopener', 'aria-label': `${c.l.app.name} release ${c.release.tag}` });
-    glow(holder, 'releases').append(symbolNode('releases'));
-    inspectable(holder, { app: c.l.app, kind: 'releases', item: c.release });
-    if (view.releaseLabels === 'all') {
-      holder.append(el('text', {
-        x: 0,
-        y: -(view.appearance.releases.size / 2 + 7) * view.appearance.releases.labelHeight,
-        'text-anchor': 'middle',
-        fill: '#E8ECF2',
-        'font-size': 12,
-        'font-weight': 700,
-        'font-family': MONO,
-      }, c.release.tag));
-    }
-    addEvent(c.p.t, holder, c.l.lane);
-    c.l.releaseEntries.push({ t: c.p.t, el: holder });
+      const holder = el('a', { 'data-layer': 'releases', transform: `translate(${p.x} ${p.y + symbolOffset(view.appearance.releases)})`, href: `https://github.com/${l.app.repo}/releases/tag/${encodeURIComponent(release.tag)}`, target: '_blank', rel: 'noopener', 'aria-label': `${l.app.name} release ${release.tag}` });
+      glow(holder, 'releases').append(symbolNode('releases'));
+      inspectable(holder, { app: l.app, kind: 'releases', item: release });
+      if (view.releaseLabels === 'all') {
+        holder.append(el('text', {
+          x: 0,
+          y: -(view.appearance.releases.size / 2 + 7) * view.appearance.releases.labelHeight,
+          'text-anchor': 'middle',
+          fill: '#E8ECF2',
+          'font-size': 12,
+          'font-weight': 700,
+          'font-family': MONO,
+        }, release.tag));
+      }
+      return holder;
+    });
   }
 }
 
 // Lane labels avoid showing today's release or issue count inside a historical replay.
 function drawNameLabels(l) {
   const { app, y, colour } = l;
-  const link = el('a', { href: `app.html?app=${encodeURIComponent(app.name)}` });
+  const link = el('a', { class: 'lane-name', href: `app.html?app=${encodeURIComponent(app.name)}`, 'aria-keyshortcuts': 'Alt+ArrowUp Alt+ArrowDown' });
   link.append(el('text', { x: NAME_X, y: y + 5, fill: colour, 'font-size': 20, 'font-weight': 750 }, app.name));
-  link.append(el('title', {}, `${app.name} · open app dashboard`));
+  link.append(el('title', {}, `${app.name} · open app dashboard · drag up or down to reorder`));
+  link.addEventListener('pointerdown', (event) => startLaneDrag(event, l));
+  link.addEventListener('click', (event) => { if (performance.now() < suppressNameClickUntil) event.preventDefault(); });
+  link.addEventListener('keydown', (event) => {
+    if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+    event.preventDefault();
+    const to = l.index + (event.key === 'ArrowUp' ? -1 : 1);
+    if (to < 0 || to >= view.lanes.length) return;
+    moveLane(l.index, to);
+    view.lanes[to].nameLink.focus();
+  });
   l.lane.append(el('circle', { cx: END_X, cy: y, r: 3, fill: colour }), link);
+  l.nameLink = link;
+}
+
+// Dragging a name up or down moves its lane; a plain click still opens the app dashboard.
+let laneDrag = null;
+let suppressNameClickUntil = 0;
+function svgY(event) {
+  const matrix = svg.getScreenCTM();
+  return matrix ? new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()).y : null;
+}
+function startLaneDrag(event, l) {
+  if (event.button !== 0 || !event.isPrimary || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+  event.stopPropagation(); // A press on a name never starts a time zoom.
+  const y = svgY(event);
+  if (y === null || view.lanes.length < 2) return;
+  laneDrag = { id: event.pointerId, lane: l, clientY: event.clientY, y, to: l.index, moved: false };
+}
+function cancelLaneDrag() {
+  if (!laneDrag) return;
+  for (const lane of view.lanes) lane.nameLink.style.transform = '';
+  laneDrag.lane.nameLink.classList.remove('dragging');
+  laneDrag.cursor?.remove();
+  laneDrag = null;
+}
+window.addEventListener('pointermove', (event) => {
+  if (!laneDrag || event.pointerId !== laneDrag.id) return;
+  if (!laneDrag.moved) {
+    if (Math.abs(event.clientY - laneDrag.clientY) < 6) return;
+    laneDrag.moved = true;
+    laneDrag.lane.nameLink.classList.add('dragging');
+    laneDrag.cursor = el('rect', { class: 'lane-drag-cursor', x: -1e5, y: -1e5, width: 2e5, height: 2e5 });
+    svg.append(laneDrag.cursor);
+  }
+  event.preventDefault();
+  const y = svgY(event);
+  if (y === null) return;
+  const slots = view.lanes.map((lane) => lane.y);
+  const from = laneDrag.lane.index;
+  const target = clamp(slots[from] + y - laneDrag.y, slots[0], slots[slots.length - 1]);
+  laneDrag.to = dropIndex(target, slots);
+  // Other names slide into the slots they would take, so the drop position is visible.
+  const order = moveItem(slots.map((_, index) => index), from, laneDrag.to);
+  for (const lane of view.lanes) {
+    const dy = lane.index === from ? target - slots[from] : slots[order.indexOf(lane.index)] - slots[lane.index];
+    lane.nameLink.style.transform = dy ? `translate(0px, ${dy.toFixed(1)}px)` : '';
+  }
+});
+window.addEventListener('pointerup', (event) => {
+  if (!laneDrag || event.pointerId !== laneDrag.id) return;
+  const { moved, lane, to } = laneDrag;
+  cancelLaneDrag();
+  if (!moved) return;
+  suppressNameClickUntil = performance.now() + 600;
+  if (to !== lane.index) moveLane(lane.index, to);
+});
+window.addEventListener('pointercancel', cancelLaneDrag);
+window.addEventListener('blur', cancelLaneDrag);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && laneDrag) { cancelLaneDrag(); event.preventDefault(); }
+});
+
+function moveLane(from, to) {
+  const all = orderApps(view.data.apps, view.order).map((app) => app.name);
+  setLaneOrder(reorderNames(all, view.lanes.map((lane) => lane.app.name), from, to));
+}
+
+function setLaneOrder(order) {
+  const isDefault = !order || order.every((name, index) => name === view.data.apps[index]?.name);
+  view.order = isDefault ? null : order;
+  try {
+    if (view.order) localStorage.setItem('craft-watch-order', JSON.stringify(view.order));
+    else localStorage.removeItem('craft-watch-order');
+  } catch { /* Preferences are optional. */ }
+  $('#reset-order').hidden = !view.order;
+  render();
+  prepareDashboard();
+  updateSelectionUI();
+  writeUrl();
 }
 
 function drawCore() {
@@ -541,7 +649,7 @@ function drawTicks() {
 }
 
 function visibleApps() {
-  return view.data.apps.filter((app) => view.selected.has(app.name));
+  return orderApps(view.data.apps.filter((app) => view.selected.has(app.name)), view.order);
 }
 
 function fitTimeline(apps) {
@@ -565,7 +673,10 @@ function fitTimeline(apps) {
 
 function render() {
   dragZoom.cancel();
+  cancelLaneDrag();
   clearInspection();
+  view.glowLayer?.dispose();
+  view.glowLayer = null;
   const defs = el('defs', {});
   defs.append(el('filter', { id: 'bloom', x: '-50%', y: '-50%', width: '200%', height: '200%' }));
   defs.querySelector('filter').append(el('feGaussianBlur', { stdDeviation: 5 }));
@@ -573,8 +684,6 @@ function render() {
   const group = el('g', {});
   const apps = visibleApps();
   fitTimeline(apps);
-  view.events = [];
-  view.shown = 0;
   const lanes = apps.map((app, index) => createLane(app, index, apps.length, defs, group));
   for (const l of lanes) {
     if (view.layers.has('commits')) drawCommits(l);
@@ -587,45 +696,26 @@ function render() {
   }
   view.lanes = lanes;
   if (view.layers.has('releases')) placeReleases(lanes);
-  for (const lane of lanes) {
-    lane.commitEntries.sort((a, b) => a.t - b.t);
-    lane.releaseEntries.sort((a, b) => a.t - b.t);
-    lane.openedEntries.sort((a, b) => a.t - b.t);
-    lane.mergedEntries.sort((a, b) => a.t - b.t);
-    lane.closedEntries.sort((a, b) => a.t - b.t);
-  }
-  view.events.sort((a, b) => a.t - b.t);
 
   view.headLine = el('line', { y1: mapLayout.axisTop, y2: mapLayout.axisBottom, stroke: '#FFFFFF', 'stroke-opacity': 0.3, 'stroke-dasharray': '4 8' });
   svg.replaceChildren(defs, drawTicks(), group, drawCore(), view.headLine);
+  if (Object.entries(view.appearance).some(([key, style]) => view.layers.has(key) && style.glow)) {
+    view.glowLayer = createGlowLayer(svg, mapLayout);
+    if (view.glowLayer) svg.insertBefore(view.glowLayer.element, group.nextSibling);
+  }
+  svg.classList.toggle('glow-batched', Boolean(view.glowLayer));
   svg.classList.toggle('replay', view.replay);
   showUntil(view.sim);
   setHead(view.sim);
 }
 
-// Shows events up to time t and hides the rest. Works forwards and backwards.
+// Shows each layer's events up to time t, within its display limit, rather than the end of
+// the replay. Works forwards and backwards.
 function showUntil(t) {
-  const events = view.events;
-  let i = view.shown;
-  while (i < events.length && events[i].t <= t) {
-    events[i].el.style.display = '';
-    i++;
-  }
-  while (i > 0 && events[i - 1].t > t) {
-    i--;
-    events[i].el.style.display = 'none';
-  }
-  view.shown = i;
-  // Apply caps to events already reached, rather than the end of the replay.
   for (const lane of view.lanes) {
-    for (const [key, entries] of [['opened', lane.openedEntries], ['commits', lane.commitEntries], ['releases', lane.releaseEntries], ['merged', lane.mergedEntries], ['closed', lane.closedEntries]]) {
-      const [from, to] = visibleRange(entries, t, eventLimit(key));
-      const previousFrom = lane[`${key}LimitFrom`] ?? 0;
-      // showUntil already handles the time boundary; touch only the cap boundary.
-      for (let index = Math.min(previousFrom, from); index < Math.max(previousFrom, from) && index < to; index++) {
-        entries[index].el.style.display = index >= from ? '' : 'none';
-      }
-      lane[`${key}LimitFrom`] = from;
+    for (const track of lane.tracks) {
+      const [from, to] = visibleRange(track.records, t, track.capped ? eventLimit(track.key) : null);
+      if (showRange(track, from, to) && view.appearance[track.key]?.glow) view.glowLayer?.invalidate();
     }
   }
 }
@@ -764,7 +854,7 @@ function renderDashboard() {
   $('#play-pause').setAttribute('aria-label', view.playing ? 'Pause replay' : 'Play replay');
   renderClock();
   $('#reset-zoom').hidden = !view.zoom;
-  $('#zoom-state').textContent = view.zoom ? 'Zoomed interval · drag again to zoom further' : 'Drag anywhere on the map to zoom · Esc cancels';
+  $('#zoom-state').textContent = view.zoom ? 'Zoomed interval · drag again to zoom further' : 'Drag anywhere on the map to zoom · drag an app name to reorder · Esc cancels';
 }
 
 function prepareDashboard() {
@@ -798,6 +888,7 @@ function writeUrl() {
   const query = new URLSearchParams(location.search);
   if (view.replay) query.set('mode', view.mode); else query.delete('mode');
   if (view.data) query.set('apps', view.selected.size === view.data.apps.length ? 'all' : [...view.selected].join(',') || 'none');
+  if (view.order) query.set('order', view.order.join(',')); else query.delete('order');
   query.set('layers', view.layers.size === LAYERS.length ? 'all' : LAYERS.filter((key) => view.layers.has(key)).join(',') || 'none');
   for (const key of LAYERS) query.set(`limit_${key}`, view.limits[key] === null ? 'all' : String(view.limits[key]));
   query.set('labels', view.releaseLabels);
@@ -1155,6 +1246,9 @@ function build(data) {
   if (query !== null) names = query === 'all' ? data.apps.map((a) => a.name) : query === 'none' ? [] : query.split(',');
   const valid = names.filter((name) => data.apps.some((a) => a.name === name));
   view.selected = new Set(valid.length || !names.length ? valid : MAIN_APPS.filter((name) => data.apps.some((a) => a.name === name)));
+  try { view.order = normalizeOrder(JSON.parse(localStorage.getItem('craft-watch-order'))); } catch { /* Ignore malformed or unavailable preferences. */ }
+  if (params.get('order') !== null) view.order = normalizeOrder(params.get('order').split(',').filter(Boolean));
+  $('#reset-order').hidden = !view.order;
   buildPicker();
   restoreLayers();
   restoreEventFilters();
@@ -1215,6 +1309,7 @@ const dragZoom = installDragZoom(svg, {
   onSelect: range => applyZoom(range),
 });
 $('#reset-zoom').addEventListener('click', () => setMode('live'));
+$('#reset-order').addEventListener('click', () => view.data && setLaneOrder(null));
 
 buildAppearanceControls();
 buildLimitControls();

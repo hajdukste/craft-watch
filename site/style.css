@@ -890,8 +890,13 @@ h2 {
 #point-facts { color: var(--muted); font-size: 11px; line-height: 1.5; }
 #space [data-inspect] { cursor: pointer; }
 /* Glow on line: stacked markers add up instead of hiding each other; labels stay opaque. */
-#space .glow { mix-blend-mode: plus-lighter; }
+#space:not(.glow-batched) .glow { mix-blend-mode: plus-lighter; }
 #space .glow .event-symbol { opacity: var(--glow-opacity); }
+#space .glow-canvas { mix-blend-mode: plus-lighter; pointer-events: none; }
+#space .glow-canvas canvas { display: block; width: 100%; height: 100%; }
+#space.glow-batched .glow .event-symbol { opacity: 0; }
+#space.glow-batched .glow.inspected .event-symbol,
+#space.glow-batched .glow:focus-visible .event-symbol { opacity: 1; }
 #space .inspected .event-symbol, #space [data-inspect]:focus-visible .event-symbol { filter: drop-shadow(0 0 4px #fff); }
 #space .inspected .pr-arc { stroke-opacity: 1; }
 @media (max-width: 760px) {
@@ -904,7 +909,13 @@ h2 {
 .zoom-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 22px 8px; min-height: 38px; font-size: 11px; color: var(--muted); }
 .zoom-toolbar button { padding: 5px 10px; font-size: 11px; }
 #space { user-select: none; touch-action: pan-y; }
-#space.selecting-time, #space.selecting-time * { cursor: col-resize !important; }
+/* Drag cursors sit on a transparent top layer; a class on #space would restyle every map element. */
+.time-selection-cursor, .lane-drag-cursor { fill: transparent; pointer-events: all; }
+.time-selection-cursor { cursor: col-resize; }
+.lane-drag-cursor { cursor: grabbing; }
+#space .lane-name { cursor: grab; touch-action: none; }
+#space .lane-name:not(.dragging) { transition: transform .16s ease; }
+#space .lane-name.dragging text { filter: drop-shadow(0 0 6px #ffffff80); }
 .time-selection { pointer-events: none; }
 .time-selection-band { fill: #b495ff; fill-opacity: .13; stroke: #b495ff; stroke-opacity: .35; stroke-width: 1; }
 .time-selection-line { stroke: #d7c5ff; stroke-width: 3; stroke-dasharray: 8 5; animation: selection-flow .7s linear infinite; }

@@ -27,10 +27,10 @@ export function installDragZoom(svg, {getRange, onStart, onCancel, onSelect, onP
     if (!drag) return;
     const previous = drag;
     drag = null;
+    if (previous.cursor?.hasPointerCapture(previous.id)) previous.cursor.releasePointerCapture(previous.id);
     previous.overlay.remove();
     onPreview(null, null);
     svg.classList.remove('selecting-time');
-    if (svg.hasPointerCapture(previous.id)) svg.releasePointerCapture(previous.id);
     if (resume) onCancel();
   }
   function draw(x) {
@@ -66,7 +66,10 @@ export function installDragZoom(svg, {getRange, onStart, onCancel, onSelect, onP
     if (!p) return;
     if (!drag.moved && Math.abs(event.clientX - drag.clientX) >= 6) {
       drag.moved = true;
-      svg.setPointerCapture(event.pointerId);
+      // The cursor lives on one top layer: a cursor style on the svg would restyle every map element.
+      drag.cursor = make('rect', {x:-1e5, y:-1e5, width:2e5, height:2e5, 'class':'time-selection-cursor'});
+      drag.overlay.append(drag.cursor);
+      drag.cursor.setPointerCapture(event.pointerId);
       svg.classList.add('selecting-time');
     }
     if (drag.moved) { event.preventDefault(); draw(p.x); }
