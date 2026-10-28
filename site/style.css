@@ -838,8 +838,35 @@ body {
 }
 
 .hero:not(.watching) .overlay .cta,
-.hero:not(.watching) .overlay .since {
+.hero:not(.watching) .overlay .since,
+.hero:not(.watching) .overlay .src-link {
   pointer-events: auto;
+}
+
+/* Link to the repo under the headline (viewers couldn't find it). */
+.src {
+  margin: 0;
+  font-size: 14px;
+}
+
+.src-link,
+.foot a {
+  color: #C4B5FD;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.4);
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.95);
+}
+
+.src-link:hover,
+.src-link:focus-visible,
+.foot a:hover,
+.foot a:focus-visible {
+  color: #FFFFFF;
+  border-bottom-color: #FFFFFF;
+}
+
+.hero.watching .src {
+  display: none;
 }
 
 .head-1 {
