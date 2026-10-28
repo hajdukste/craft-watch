@@ -32,3 +32,8 @@ npm run dev       # preview the site locally
 ```
 
 An optional `GITHUB_TOKEN` environment variable raises rate limits. It is read from the environment only and is never stored.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Use it, run it locally, point it at other repos, change it. Keep the copyright notice.
+The collected data is public GitHub data; the apps it watches have their own licenses.
