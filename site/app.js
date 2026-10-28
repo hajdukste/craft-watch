@@ -43,6 +43,38 @@ const view = {
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
+// A stable number in [0, 1) from a string (FNV-1a), so each point twinkles the same way on every load.
+function hash01(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0) / 4294967296;
+}
+
+// One point in eight (picked by hash, so always the same ones) flares and keeps its pulse ring;
+// the rest only twinkle softly. Animating size on every point made the map drop to ~15 fps.
+const FLARE_SHARE = 0.125;
+const flares = (key) => hash01(`${key}!`) < FLARE_SHARE;
+
+// Twinkle timing for one point: its own speed and its own place in the cycle.
+function twinkle(key) {
+  const a = hash01(key);
+  const b = hash01(`${key}#`);
+  const duration = 2.4 + a * 3.6; // 2.4–6 s
+  return {
+    class: flares(key) ? 'twinkle' : 'twinkle-soft',
+    style: `--tw: ${duration.toFixed(2)}s; animation-delay: ${(-b * duration).toFixed(2)}s`,
+  };
+}
+
+// Edges brighten in a wave that runs left to right: the delay grows with x.
+const WAVE_S = 4;
+function waveDelay(x) {
+  return `animation-delay: ${((x / END_X) * WAVE_S - WAVE_S).toFixed(2)}s`;
+}
+
 function el(name, attrs = {}, text) {
   const node = document.createElementNS(SVG_NS, name);
   for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
@@ -157,19 +189,22 @@ function fixedRelease(advisory, releases) {
   return releases.find((r) => patched.has(version(r.tag)) && Date.parse(r.published_at) >= Date.parse(advisory.published_at)) ?? null;
 }
 
-function commitNode(p, colour) {
+function commitNode(p, colour, key) {
   const holder = translate(p);
   holder.append(
-    el('circle', { r: 1.6, fill: colour, 'fill-opacity': 0.35 }),
-    el('circle', {
+    el('circle', { r: 1.6, fill: colour, 'fill-opacity': 0.35, ...twinkle(key) }),
+  );
+  // Pulse rings only on the flaring points: a ring on every commit was the site's main drag on frame rate.
+  if (flares(key)) {
+    holder.append(el('circle', {
       class: 'commit-pulse',
       r: 2.2,
       fill: 'none',
       stroke: colour,
       'stroke-width': 0.6,
       style: `animation-delay: ${(-(p.t % 3000) / 1000).toFixed(2)}s`,
-    }),
-  );
+    }));
+  }
   return holder;
 }
 
@@ -190,6 +225,18 @@ function createLane(app, index, count, defs, group) {
   const line = el('path', { d, stroke: `url(#lane-${index})`, 'stroke-width': 1.4, fill: 'none' });
   defs.append(gradient(`lane-${index}`, colour, [[0, 0.1], [0.3, 1], [1, 0.9]]));
   lane.append(el('path', { d, stroke: colour, 'stroke-width': 12, 'stroke-opacity': 0.12, fill: 'none', filter: 'url(#bloom)' }), line);
+  // A pulse of light that travels the lane from the core outwards; lanes start one after another.
+  lane.append(el('path', {
+    d,
+    class: 'lane-wave',
+    stroke: colour,
+    'stroke-width': 2.4,
+    'stroke-linecap': 'round',
+    fill: 'none',
+    pathLength: 1000,
+    'stroke-dasharray': '70 930',
+    style: `animation-delay: ${(-(index / Math.max(count, 1)) * 6).toFixed(2)}s`,
+  }));
   group.append(lane);
   return { app, index, count, y, colour, compact: count > MAIN_APPS.length, samples: sampleLane(line), lane, defs };
 }
@@ -198,7 +245,7 @@ function drawCommits(l) {
   for (const iso of l.app.commit_times ?? []) {
     if (!inScale(iso)) continue;
     const p = place(l.samples, iso);
-    if (p) addEvent(p.t, commitNode(p, l.colour), l.lane);
+    if (p) addEvent(p.t, commitNode(p, l.colour, `${l.app.repo}|${iso}`), l.lane);
   }
 }
 
@@ -224,13 +271,15 @@ function drawArcs(l) {
           'stroke-opacity': 0.85,
           'stroke-dasharray': '1.5 4',
           'stroke-linecap': 'round',
+          class: 'arc-wave',
+          style: waveDelay(from.x),
         });
         arc.append(el('title', {}, `Merged · ${title}`));
         addEvent(from.t, arc, l.lane);
       }
       const landing = translate(to);
       landing.append(el('circle', { r: 7, fill: 'none', stroke: '#FFFFFF', 'stroke-opacity': 0.35 }));
-      landing.append(el('circle', { r: 3.2, fill: '#FFFFFF' }));
+      landing.append(el('circle', { r: 3.2, fill: '#FFFFFF', ...twinkle(`${l.app.repo}|pr${pr.number}`) }));
       landing.querySelector('circle:last-child').append(el('title', {}, `Merged · ${title}`));
       addEvent(to.t, landing, l.lane);
     } else if (pr.closed_at) {
@@ -238,7 +287,7 @@ function drawArcs(l) {
       if (!drawArc) return;
       const id = `fade-${l.index}-${k}`;
       l.defs.append(gradient(id, l.colour, [[0, 0.9], [1, 0]], true));
-      const arc = el('path', { d: arcPath(from, to, -lift), fill: 'none', stroke: `url(#${id})`, 'stroke-width': 1.2 });
+      const arc = el('path', { d: arcPath(from, to, -lift), fill: 'none', stroke: `url(#${id})`, 'stroke-width': 1.2, class: 'arc-wave', style: waveDelay(from.x) });
       arc.append(el('title', {}, `Closed without merging · ${title}`));
       addEvent(from.t, arc, l.lane);
     } else {
@@ -252,6 +301,8 @@ function drawArcs(l) {
         'stroke-opacity': 0.45,
         'stroke-dasharray': '1.5 4',
         'stroke-linecap': 'round',
+        class: 'arc-wave',
+        style: waveDelay(from.x),
       });
       arc.append(el('title', {}, `Open · ${title}`));
       addEvent(from.t, arc, l.lane);
@@ -340,7 +391,7 @@ function placeReleases(lanes) {
 
   for (const c of candidates) {
     const holder = translate(c.p);
-    holder.append(el('circle', { r: 3.6, fill: '#FFFFFF', stroke: c.l.colour, 'stroke-width': 1.2 }));
+    holder.append(el('circle', { r: 3.6, fill: '#FFFFFF', stroke: c.l.colour, 'stroke-width': 1.2, ...twinkle(`${c.l.app.repo}|${c.release.tag}`) }));
     holder.querySelector('circle').append(el('title', {}, `Release ${c.release.tag} · ${c.l.app.name}`));
     if (c.label) {
       holder.append(el('text', {

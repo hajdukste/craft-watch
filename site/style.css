@@ -296,13 +296,68 @@ body {
   100% { transform: scale(3.2); opacity: 0; }
 }
 
+/* Twinkling points: each has its own hashed speed and phase (set in app.js). Only opacity and
+   transform animate, so the browser can do it without redrawing the map. */
+.twinkle {
+  animation: point-twinkle var(--tw, 3.6s) ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Most points: opacity only, which stays cheap even for hundreds of points. */
+.twinkle-soft {
+  animation: point-twinkle-soft var(--tw, 3.6s) ease-in-out infinite;
+}
+
+@keyframes point-twinkle-soft {
+  0%, 100% { opacity: 0.5; }
+  12% { opacity: 1; }
+}
+
+@keyframes point-twinkle {
+  0%, 100% { opacity: 0.55; transform: scale(0.85); }
+  12% { opacity: 1; transform: scale(1.45); }
+  30% { opacity: 0.8; transform: scale(1); }
+}
+
+/* Edges: a soft sine-like brightness wave from left to right (delay grows with x). */
+.arc-wave {
+  animation: edge-wave 4s ease-in-out infinite alternate;
+}
+
+@keyframes edge-wave {
+  from { opacity: 0.45; }
+  to { opacity: 1; }
+}
+
+/* A pulse of light travelling each lane outwards from the core. */
+.lane-wave {
+  stroke-opacity: 0.9;
+  animation: lane-wave 6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes lane-wave {
+  from { stroke-dashoffset: 70; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  to { stroke-dashoffset: -1000; opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stars2,
   .live-dot,
   .commit-pulse,
   .core,
-  .ring {
+  .ring,
+  .twinkle,
+  .twinkle-soft,
+  .arc-wave,
+  .lane-wave {
     animation: none;
+  }
+
+  .lane-wave {
+    display: none;
   }
 }
 
